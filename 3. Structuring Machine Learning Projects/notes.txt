@@ -1,0 +1,280 @@
+STRUCTURING MACHINE LEARNING PROJECTS
+
+
+
+ML Strategy 1
+
+-> Introduction to ML Strategy
+
+[Orthogonalization]
+"Ortogonalização" se refere à disponibilização de parâmetros (knobs) que alteram propriedades específicas do sistema
+(sem que a alteração de um dos parâmetros adicione ruídos nas propriedades que são controladas por outros parâmetros)
+
+Cadeia de suposições em ML:
+	-> Fit training set well on cost function 
+		Se não possuir boa performance no conjunto de treinamento:
+			- knobs: aumentar o tamanho da NN, escolher outro algoritmo (Adam), ...
+	-> Fit dev set well on cost function 
+		Se não possuir boa performance no conjunto dev:
+			- knobs: regularização, aumentar o conjunto de treinamento, ...
+	-> Fit test set well on cost function
+		Se não possuir boa performance no conjunto de teste:
+			- knobs: aumentar o conjunto dev, ...
+	-> Performs well on real world
+		Se não possuir boa performance no mundo real:
+			- knobs: alterar os conjuntos dev/teste (podem ter distribuições diferentes do conjunto de treinamento) ou a função de custo
+
+-> Setting Up Your Goal
+
+[Single Number Evaluation Metric]
+Medida de performance: Usar F1_Score (média harmônica entre precisão e recall)
+Medida de erro: Se o classificador possui diferentes erros para, por exemplo, imagens vindas de diferentes países, é recomendado tratar o erro total como a média dos erros
+
+[Satisficing and Optimizing Metric]
+Se quisermos por exemplo maximizar a acurácia e minimizar o running time entre diferentes classificadores:
+	Se existe alguma limitação do tipo running time <= 100ms, basta escolhermos o classificador com melhor acurácia (optimize) entre os que satisfazem essa restrição (satisfy)
+
+[Train/dev/test Distributions]
+A melhor prática é pegar amostras aleatórias para cada um dos conjuntos para garantir que as distribuições sejam iguais
+
+[Size of the Dev and Test Sets]
+Forma antiga de divisão (datasets de [100 10.000] amostras):
+	Train/Test -> 70%/30%
+	Train/Dev/Test -> 60%/20%/20%
+Atualmente, para um dataset de 1.000.000 de amostras (Big Data):
+	Train/Dev/Test -> 98%/1%/1%		(1% = 10.000)
+
+Guideline: O conjunto de teste deve ser grande o suficiente para garantir alta confiança na performance geral do sistema    (10.000 - 100.000)
+
+[When to Change Dev/Test Sets and Metrics]
+Podemos ter um caso em que um algoritmo A tem melhor acurácia que um algoritmo B, mas o conjunto de erros do algoritmo A exibe imagens inaceitáveis para o usuário (como imagens pornográgicas) -> Nesse caso B é preferível
+Para captar essa característica, podemos incluir pesos nos erros:
+	Error: sum(I(y_pred != y) * w_i para i de 1 até m_dev) / sum(w_i)        [aqui o erro pode ser considerado um knob]
+	Onde w_i = 10 se a imagem e for pornográfica e w_i = 1 caso contrário
+	(Podemos também incluir w_i na função de custo J)
+
+-> Comparing to Human-Level Performance
+
+[Why Human-Level Performance]
+Bayes Optimal Error: Melhor erro possível para uma função que mapeia X -> Y   (não necessariamente 0%)
+Quando ML é pior que o desempenho humano, podemos:
+	- Obter dados classificados por humanos
+	- Ganhar insights a partir de análise manual dos erros
+	- Melhor análise de viés/variância
+OBS: Erro de Bayes <= Erro Humano
+
+[Avoidable Bias]
+Normalmente usamos o erro humano como um "proxy" (aproximação) do erro de Bayes
+Exemplo de erros (1):
+	Humano (~ Bayes) - 1%
+	Train - 8%
+	Dev - 10%
+Nesse caso precisamos focar em reduzir o viés (bias)
+
+Exemplo de erros (2):
+	Humano (~ Bayes) - 7.5%
+	Train - 8%
+	Dev - 10%
+Nesse exemplo precisamos focar em reduzir a variância, pois o erro no conjunto de treino é próximo ao de um humano
+
+A diferença entre o erro no conjunto de treinamento e o erro humano (erro de Bayes) é definido como "Avoidable Bias"
+A diferença entre o erro no conjunto de treinamento e o erro no conjunto dev é definido como variância
+
+[Understanding Human-Level Performance]
+Exemplo: Classificação de imagem médica
+	Humano típico -> 3% de erro
+	Médico típico -> 1% de erro
+	Médico experiente -> 0.7% de erro
+	Time de médicos experientes -> 0.5% de erro
+Qual é o Human-Level error?
+	-> Bayes Error <= 0.5
+
+[Surpassing Human-Level Performance]
+Exemplo 1:
+	Team of Humans -> 0.5%
+	One Human -> 1%
+	Training error -> 0.6%
+	Dev error -> 0.8%
+Avoidable Bias = 0.1%
+Variance = 0.2%
+	=> Reduzir variância
+
+Exemplo 2:
+	Team of Humans -> 0.5%
+	One Human -> 1%
+	Training error -> 0.3%
+	Dev error -> 0.4%
+Avoidable Bias = ? 		(Erro de Bayes não pode ser estimado)
+Variance = 0.1%
+
+[Improving Your Model Performance]
+Duas suposições fundamentais:
+	-> Podemos aderir (fit) ao conjunto de treinamento muito bem
+		- Podemos conseguir Avoidable Bias pequeno
+	-> A performance do conjunto de treinamento generaliza muito bem aos conjuntos dev e de teste
+		- Podemos conseguir variância pequena
+
+Resumo:
+	-> Reduzir Avoidable Bias:
+		- Treinar um modelo maior
+		- Treinar por mais tempo / com algoritmos mais otimizados (Momentum, Adam, RMSprop, ...)
+		- Encontrar uma arquitetura melhor para a rede neural (RNN, CNN) / busca de hiperparâmetros
+	-> Reduzir variância:
+		- Mais dados
+		- Regularização (L2, Dropout, Data Augmentation)
+		- Encontrar uma arquitetura melhor para a rede neural / busca de hiperparâmetros
+
+
+
+ML Strategy 2
+
+-> Error Analysis
+
+[Carrying Out Error Analysis]
+Quando o modelo comete mais erros que um humano podemos ganhar insights a partir de análise manual dos erros
+Suponhamos que seu modelo esteja classificando algumas imagens de cães como gatos (90% de acurácia)
+	Deveríamos focar nossos esforços para tornar nosso classificador melhor para imagens de cães?
+	Análise de erros:
+		- Pegar 100 imagens que foram classificadas de forma errada (10%)
+		- Contar quantas são imagens de cães (suponhamos 5%) (0.05% do total)
+			-> Melhorar o classificador para esse caso representaria um aumento na acurácia de até 90.5% (portanto, esse poderia não ser a melhor forma de investir o seu tempo)
+
+Também podemos avaliar múltiplas ideias em paralelo
+	- Corrigir para o caso de cães sendo reconhecidos como gatos
+	- Corrigir para o caso de outros felinos sendo reconhecidos como gatos (leões, panteras, ...)
+	- Melhorar a performance para imagens borradas / de baixa definição
+	- Filtros do Instagram
+
+Tabela da análise:
+Image 	Dog		Great Cat 	Blurry	Instagram	Comments
+1		X 							X			Pitbull
+2							X		X
+3 				X			X					Rainy day at zoo
+...		
+%		8%		43%			61%		12%
+
+O resultado implica que não valeria muito a pena gastar recursos em melhorar o classificador para os casos de cães e filtros do Instagram
+
+[Cleaning Up Incorrectly Labeled Data]
+Amostras classificadas de forma incorreta no conjunto de treinamento:
+	Algoritmos de Deep Leaning são robustos com relação a erros aleatórios no conjunto de treinamento, nesse caso não é tão grave se existirem poucas amostras classificadas de forma incorreta no conjunto de treinamento
+	Mas não são robustos com relação a erros sistemáticos
+		-> Por exemplo, se cães brancos sempre são classificados como gatos, o modelo quase sempre errará nesse caso
+
+Amostras classificadas de forma incorreta nos conjuntos dev/teste:
+	Incluir a coluna "Incorectly Labeled" na tabela de análise dos erros para determinar qual a porcentagem de erros dada pela classificação incorreta
+		-> Dependendo da porcentagem em relação aos outros erros, pode ou não ser relevante realizar a correção dessas classificações
+	Corrigindo exemplos:
+		-> Aplicar o mesmo processo nos conjuntos dev e teste e garantir que eles continuam tendo a mesma distribuição
+		-> Considere examinar exemplos em que o algoritmo acertou, além dos exemplos em que ele errou
+		-> Os conjuntos de dados de treinamento e dev/teste agora possuem distribuição um pouco diferentes
+
+[Build Your First System Quickly, Then Iterate]
+Exemplo: Speech Recognition
+	-> Direções:
+		- Noisy Background
+			- Café noise
+			- Car noise
+		- Accented speech
+		- Far from microphone
+		- Young children's speech
+		- Stuttering (engasgando)
+		...
+	-> Recomendações:
+		- Escolha de métrica e definição de conjuntos dev/test (definição do alvo)
+		- Construir um sistema inicial rapidamente
+		- Usar análise de Bias/Variance e análise de erro para definir e priorizar os próximos passos
+		->>> Desenvolva seu primeiro sistema rápido, e itere
+
+-> Mismatched Training and Dev/Test Set
+
+[Training and Testing on Different Distributions]
+Exemplo: Identificação de gatos em fotos tiradas por um usuário no dispositivo mobile
+	-> Fotos tiradas por usuários: 10.000		[distribuição mais relevante para a solução]
+	-> Fotos obtidas da internet: 200.000
+Opções:
+	- Juntar os dados, obtendo 210.000 amostras, e permutar para criar os conjuntos de treino, dev e teste (205.000 / 2.500 / 2.500)	[Opção não recomendada]
+		-> Vantagem: Mesma distribuição
+		-> Desvantagem: A maior parte vem da internet
+	- Colocar todas as imagens vindas da internet no conjunto de treinamento junto com algumas fotos tiradas por usuários e ter nos conjuntos dev/teste exclusivamente fotos tiradas por usuários (205.000 / 2.500 / 2.500)		[Opção mais indicada]
+		-> Vantagem: Melhor definição do "alvo" nos conjuntos dev/teste
+		-> Desvantagem: Distribuições diferentes entre train e o dev/test
+
+[Bias and Variance with Mismatched Data Distributions]
+O processo de análise de viés/variância muda quando os dados de treino possuem distribuição diferente dos dados de dev/teste
+Exemplo: Imagens de gatos
+	Suponhamos que o erro humano (Bayes) ~ 0%
+	Erro de treino: 1%
+	Erro dev: 10%
+	Antes diríamos que esse é um problema de variância, mas como as distribuições são diferentes, não necessariamente essa é a conclusão correta a ser tomada
+
+Definição de outro conjunto de dados que ajudará na avaliação:
+	Conjunto training-dev: Mesma distribuição que o conjunto de treinamento, mas não é usado para treino
+Exemplo 1:
+	Erro de treino: 1%
+	Erro treino-dev: 9%
+	Erro dev: 10%
+	-> Isso implica um problema de variância, uma vez que o conjunto train-dev possui a mesma distribuição que o conjunto train e mesmo assim o erro foi grande no conjunto train-dev
+Exemplo 2:
+	Erro de treino: 1%
+	Erro treino-dev: 1.5%
+	Erro dev: 10%
+	-> Problema de "Data Mismatch": O algoritmo aprendeu a ter bom desempenho em um distribuição diferente da contida no conjunto dev
+
+[Addressing Data Mismatch]
+Não existem soluções sistemáticas para resolver esse problema, mas algumas tentativas podem ajudar:
+	- Realizar análise manual dos erros para tentar entender as diferenças entre os conjuntos
+	- Tornar os dados de treinamento mais parecidos com os conjuntos dev/test (síntese artificial de dados), ou coletar mais dados parecidos com os conjuntos dev/test
+
+OBS: O algoritmo pode sobreajustar (overfit) um subconjunto gerado pela síntese artificial de dados
+
+-> Learning From Multiple Tasks
+
+[Transfer Learning]
+Uma NN que aprendeu uma tarefa (reconhecer gatos em uma imagem, por exemplo) pode aplicar esse mesmo conhecimento para realizar uma tarefa diferente (leitura de raio-x, por exemplo)
+Basicamente descartamos a última camada da NN (camada de saída) e os pesos (W e b) que mapeiam da camada anterior para ela, e criamos uma (ou mais) nova(s) camada(s) de saída com novos pesos (W e b) gerados aleatoriamente e retreinamos a(s) última(s) camada(s) (ou as k anteriores) com os (X, Y) da nova tarefa
+
+Intuição: As features derivadas em camadas mais baixas podem ser reutilizadas para a realização da nova tarefa
+
+Quando a transferência de aprendizado de uma tarefa A para uma tarefa B faz sentido?
+	-> Tarefas A e B possuem a mesma entrada X (uma imagem, por exemplo)
+	-> Você possue muito mais dados da tarefa A do que da tarefa B
+	-> Features "de baixo nível" da tarefa A podem ajudar no aprendizado da tarefa B
+
+[Multi-task Learning]
+Exemplo: Carro autônomo
+	Precisa detectar:
+		- Pedestres
+		- Carros
+		- Sinais de parada
+		- Semáforos
+	y_i é (4,1), por exemplo [0 1 1 0].T
+	Y = [y_1, y_2, ..., y_m] (4,m)
+	Loss: sum(sum(L(yhat_i_j, y_i_j) para j de 1 até 4) para i de 1 até m)     [onde L(yhat, y) é o custo de uma amostra da regressão logística]
+	OBS: != de softmax pois uma imagem pode ter múltiplos labels  =>  Multi-task Learning
+	Poderíamos treinar 4 classificadores diferentes, mas a vantagem do multi-task é que os classificadores podem compartilhar as features derivadas das camadas mais baixas
+
+Quando faz sentido usar multi-task learning?
+	-> Treino de um conjunto de tarefas que podem se beneficiar por terem features em comum nas camadas mais baixas
+	-> Normalmente: a quantidade de dados que você possui para cada tarefa é similar
+	-> É possível treinar em uma rede neural grande o suficiente para ter boa performance em todas as tarefas
+
+-> End-to-end Deep Learning
+
+[What is End-to-end Deep Learning]
+Basicamente é a substituição de sistemas de aprendizado/processamento de dados com muitas etapas por uma única rede neural
+Exemplo: Reconhecimento de fala
+	audio (X) -> extração de features (MFCC) -> fonemas (ML) -> palavras -> transcrição (Y)		[3.000 horas]
+	Deep Learning: audio (X) -> transcrição (Y)
+		-> Desvantagem: precisa de uma grande quantidade de dados para funcionar bem [10.000 - 100.000 horas]
+
+[Whether to Use End-to-end Deep Learning]
+Pros:
+	- "Let the data speak" (X -> Y)												[Data]
+		-> Não depende de pressuposições humanas
+	- Menos trabalho para o desenvolvimento manual de componentes necessários	[Hand-Design]
+Cons:
+	- Pode necessitar de uma grande quantidade de dados (X, Y)					[Data]
+	- Exclui componentes desenvolvidos manualmente que poderiam ser úteis		[Hand-Design]
+
+Principal pergunta: Eu possuo dados o suficiente para aprender uma função de complexidade necessária para mapear X para Y?

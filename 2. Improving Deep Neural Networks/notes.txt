@@ -1,0 +1,293 @@
+IMPROVING DEEP NEURAL NETWORKS: HYPERPARAMETER TUNING, REGULARIZATION AND OPTIMIZATION
+
+
+
+Practical Aspects of Deep Learning
+
+[Train/Dev/Test Sets]
+A ideia é usarmos o dev set para otimizarmos os hiperparâmetros do algoritmo (alpha, lambda, número de camadas, ...)
+Para datasets não muito grandes fazia sentido pensar em uma divisão 60% train, 20% dev, 20% test
+Porém no contexto de Big Data podemos chegar a divisões como: 99.5% train, 0.4% dev, 0.1% test [supondo que essas porcentagens bastem para a realização do ajuste de hiperparâmetros e teste]
+Regra básica: garantir que os sets dev e test venham da mesma distribuição do set train
+
+[Bias / Variance]
+Para NN não temos a ideia de "trade-off" entre viés e variância
+Se o viés é alto devemos aumentar a rede (adicionando nós ou camadas) e isso normalmente não afeta a variância
+Já quando a variância é alta podemos tentar ajustar a regularização, obter mais dados ou mesmo tentar/pesquisar uma arquitetura de rede diferente (e isso normalmente não afeta o viés)
+
+[Regularization]
+Regularização deve ser a primeira tentativa quando for identificado o overfitting (variância grande)
+Em regularização, adicionamos um termo à função de custo a ser minimizada
+Regressão logística:
+	J(w, b) = sum(L(yhat, y)) / m + lambda * ||w||^2 / (2*m)
+	Quando ||w|| é a norma euclidiana (||w||^2 = w.T * w), chamamos a regularização de L2
+	Quando ||w|| é o módulo (||w|| = sum(|w|)), chamamos a regularização de L1
+
+NN:
+	J(W1, b1, ..., WL, bL) = sum(L(yhat, y)) / m + lambda * sum(||Wl||^2 para l de 1 até L) / (2*m)
+	||Wl||^2 = sum(sum(wl_i_j^2))   [norma de Frobenius]
+
+[Dropout Regularization]
+A ideia básica dessa regularização é descartar aleatoriamente alguns nós da NN a cada iteração do gradiente decrescente
+Inverted Dropout: (Exemplo para l = 3)
+keep_prob = 0.8		[pode variar para cada camada]
+d3 = np.random.rand(a3.shape[0], a3.shape[1]) < keep_prob
+a3 = np.multiply(a3, d3)
+a3 /= keep_prob		[para não mudar a esperança de a3]
+
+Intuição: Não poder confiar em nenhuma feature em específico faz com que os pesos sejam espalhados
+Normalmente é usado em Computer Vision pois overfitting é frequente
+Desvantagem: J não é tão bem definida como antes
+
+[Other Regularization Methods]
+Data Augmentation: aumentar o dataset de treino aplicando transformações aos dados
+Early Stop: plotar o erro no dataset de treino e no dataset dev e "parar antes" (onde o erro no dataset dev é menor)
+	A ideia é otimizar J e não sobreajustar em um mesmo processo, em vez de pensarmos em procedimentos diferentes
+
+[Vanishing/Exploding Gradients]
+Em redes neurais muito profundas podemos ter o problema de desaparecimento ou explosão dos gradientes
+O gradiente pode crescer ou decrescer exponencialmente de acordo com o número da camada em questão, o que pode impactar/inviabilizar o treino
+Podemos resolver esse problema parcialmente com a inicialização das matrizes de pesos Wl da seguinte forma:
+	Wl = np.random.randn(shape) * np.sqrt(2/n{l-1})     [Var(Wl) = 2/n{l-1}]
+	Se estivermos usando tanh no lugar de ReLU, é melhor substituir np.sqrt(2/n{l-1}) por np.sqrt(1/n{l-1})
+
+Isso faz com que os pesos fiquem próximos a 1, fazendo com que a explosão/desaparecimento de gradientes demore mais para acontecer
+
+
+
+Optimization Algorithms
+
+[Mini-batch Gradient Descent]
+Quando o número de observações do conjunto de treinamento (m) é muito grande, podemos escolher uma quantidade de observações ("minilote") para executarmos o gradiente decrescente por vez
+Por exemplo, para minilote = 1000, dividimos as matrizes X (nx, m) e Y (1, m) em pedaços menores X_t (nx, 1000) e Y_t (1, 1000)
+Algoritmo (m = 5000000, minilote = 1000):
+	for t = 1, ..., 5000:
+		Forward Prop on X_t:
+			Z1 = W1 * X_t + b1
+			...
+			AL = gL(ZL)
+		Compute cost: J_t = sum(L(yhat_i, y_i)) / 1000 + lambda * sum(||Wl||^2) / (2 * 1000)
+		Back Prop to compute grads of J_t (using (X_t, Y_t))
+		Wl = Wl - alpha * dWl
+		bl = bl - alpha * dbl
+
+OBS: Stochastic Gradient Descent (SGD) é o mini-batch com minilote = 1
+OBS2: geralmente é melhor escolher uma potência de 2 como tamanho de minilote (outro hiperparâmetro)
+OBS3: É recomendado permutar X antes de construir os minilotes
+
+[Exponentially Weighted Avarages]
+Exemplo: Temperatura em Londres ao longo do ano
+	v_0 = 0
+	v_t = beta * v_{t-1} + (1 - beta) * theta_t    [média ponderada entre o v anterior e a temperatura (theta) atual]
+v_t pode ser interpretado como a aproximação da média das últimas 1 / (1 - beta) amostras (com 0 < beta < 1)
+Intuição: v_100 = (1-beta)*theta_100 + (1-beta)*beta*theta_99 + (1-beta)*beta^2 * theta_98 + ...
+
+Bias correction: v_t / (1 - beta^t)  [corrige a estimativa dos primeiros dias/observações] (normalmente não é muito usado)
+
+[Gradient Descent with Momentum (Momentum)]
+Quase sempre funciona melhor que o gradiente decrescente tradicional
+A ideia básica é calcular as médias exponencialmente ponderadas dos gradientes e usá-los na atualização dos pesos (isso faz com que a direção não varie tanto de uma iteração para outra)
+Momentum algorithm: (hiperparâmetros: alpha, beta = 0.9)
+	On iterarion t:
+		Compute dW, db on current mini-batch
+		Vdw = beta * Vdw + (1 - beta) * dW
+		Vdb = beta * Vdb + (1 - beta) * db
+
+		W = W - alpha * Vdw
+		b = b - alpha * Vdb
+
+[RMSprop]
+"Propagação de raíz quadrada média" (Root Mean Square Prop) também pode acelerar o gradiente decrescente
+RMSprop:
+	On iterarion t:
+		Compute dW, db on current mini-batch
+		Sdw = beta2 * Sdw + (1 - beta2) * dw^2 [^2 é element-wise]
+		Sdb = beta2 * Sdb + (1 - beta2) * db^2 [^2 é element-wise]
+
+		W = W - alpha * dw/(sqrt(Sdw) + epsilon)		[+ epsilon = 10^(-8) para evitar que o denominador seja muito pequeno e "exploda" o gradiente]
+		b = b - alpha * db/(sqrt(Sdb) + epsilon)
+
+[Adam Optimization Algorithm]
+Adam: Adaptive Moment Estimation
+É basicamente a união entre Momentum e RMSprop: (hiperparâmetros: beta1 = 0.9, beta2 = 0.999, epsilon = 10^(-8), alpha)
+	Vdw = 0, Sdw = 0, Vdb = 0, Vdw = 0
+	On iterarion t:
+		Compute dW, db on current mini-batch
+		Vdw = beta1 * Vdw + (1-beta1) * dW, Vdb = beta1 * Vdb + (1-beta1) * db 		[Momentum]
+		Sdw = beta2 * Sdw + (1-beta2) * dw^2, Sdb = beta2 * Sdb + (1-beta2) * db^2	[RMSprop]
+
+		Vdw_corrigido = Vdw / (1-beta1^t), Vdb_corrigido = Vdb / (1-beta1^t)
+		Sdw_corrigido = Sdw / (1-beta2^t), Sdb_corrigido = Sdb / (1-beta2^t)
+
+		W = W - alpha * Vdw_corrigido / (sqrt(Sdw_corrigido) + epsilon)
+		b = b - alpha * Vdb_corrigido / (sqrt(Sdb_corrigido) + epsilon)
+
+[Learning Rate Decay]
+Diminuir a taxa de aprendizado aos poucos também pode acelerar a convergência
+Definição:
+	epoch 1: primeira passada por todo o conjunto de aprendizado X = [X_1 X_2 ... ]
+	epoch 2: segunda passada por todo o conjunto de aprendizado X = [X_1 X_2 ... ]
+	...
+O decaimento normalmente é implementado com:
+	alpha = alpha_0 / (1 + decayRate * epochNumber)
+
+Outras alternativas:
+	-> alpha = 0.95^epochNumber * alpha_0
+	-> alpha = k * alpha_0 / sqrt(epochNumber)    ou    alpha = k / sqrt(epochNumber)
+	-> Manual decay
+
+[The Problem of Local Optima]
+Em redes neurais a maioria dos "mínimos locais" com derivadas zero não são como intuitivamente costumamos pensar, os problemas mais comuns são: 
+	-> pontos de cela: ponto em que algum eixo possui derivada zero por ser máximo, não mínimo
+	-> plateaus: o algoritmo pode demorar muito dando passos nessas regiões, apesar de não ficar preso em um mínimo local
+
+
+
+Hyperparameters Tuning, Batch Normalization and Programming Frameworks
+
+-> Hyperparameter Tuning
+
+[Tuning Process]
+Para NN os hiperparâmetros aos quais mais devemos nos atentar, em ordem, são:
+	1 - alpha
+	2 - beta (Momentum) ~ 0.9
+	2 - tamanho do minilote
+	2 - número de hidden units
+	3 - número de camadas
+	4 - beta1, beta2, epsilon (quando usamos Adam, normalmente os valores padrão [0.9, 0.999, 10^(-8)] funcionam muito bem)
+
+Na busca pelos melhores hiperparâmetros é uma boa prática tentar com valores aleatórios, não com grid (combinação entre conjuntos de valores predeterminados)
+Essa abordagem garante uma exploração mais rica pelo domínio dos hiperparâmetros
+Também é uma boa prática começar com pontos mais esparsos e, após encontrar uma região com bons resultados, realizar a exploração em um conjunto mais denso (concentrado na região encontrada)  [coarse to fine]
+
+[Using an Appropriate Scale to Pick Hyperparameters]
+Para hiperparâmetros normalmente muito pequenos (como alpha), é melhor sortear valores na escala log:
+	r = -4 * np.random.rand()       {r em [-4, 0]}
+	alpha = 10^r 					{alpha em [10^-4, 1]}
+
+Para o hiperparâmetro beta também é recomendado usar a escala log em (1 - beta) se queremos, por exemplo, beta em [0.9, 0.999]:
+	r = -1 - 2 * np.random.rand()       {r em [-1, -3]}
+	1 - beta = 10^r => beta = 1 - 10^r 	{beta em [0.9, 0.999]}
+
+[Hyperparameters Tuning in Practice: Pandas vs Caviar]
+Retestar os hiperparâmetros escolhidos periodicamente depois de alguns meses
+Abordagem "Panda": cuidar do modelo a cada dia, alterando os hiperparâmetros de forma a otimizar a curva de aprendizado
+Abordagem "Caviar": gerar diversos modelo em paralelo e escolher o melhor
+
+-> Batch Normalization
+
+[Normalizing Activations in a Network]
+Assim como normalizar X ajuda a acelerar o gradiente decrescente para a regressão logística, normalizar os Zl de cada camada também pode acelerar a convergência
+Batch Norm (para Zl):
+	mu = sum(Zl_i para i de 1 até m) / m
+	sigma2 = sum((Zl_i - mu)^2 para i até m) / m
+	ZlNorm = (Zl - mu) / sqrt(sigma2 + epsilon)
+	~Zl = gamma * ZlNorm + beta   [gamma e beta controlam o desvio padrão e a média da nova variável (nem sempre queremos média 0 e devio padrão 1)]
+
+[Fitting Batch Norm into a Neural Network]
+Calculamos ~Zl após o cálculo de Zl e antes do cálculo de Al utilizando os parâmetros Beta_l, Gamma_l
+É necessário calcular dBeta_l
+Por conta da normalização e inclusão dos Beta_l, podemos remover os bl:
+	Zl = Wl * a{l-1}
+	Calcular ZlNorm com média e desvio padrão
+	~Zl = Gamma_l * ZlNorm + Beta_l
+
+Gradiente Decrescente (minilote):
+	for t = 1, ..., numMiniBatches:
+		Compute forward prop on X_t
+			In each hidden layer l, use Batch Norm to replace Zl with ~Zl
+		Use back prop to compute dWl, dBeta_l, dGamma_l
+		Update parameters Wl, Beta_l, Gamma_l
+
+[Batch Norm at Test Time]
+Para prever é necessário usarmos valores para mu e sigma2
+Podemos estimar mu_test e sigma2_test usando médias exponencialmente ponderadas através de cada minilote
+Dessa forma:
+	zNorm = (z - mu_test) / sqrt(sigma2_test + epsilon)
+	~z = Gamma * zNorm + Beta
+
+-> Multi-class Classification
+
+[Softmax Regression]
+C = # de classes	(0, ..., C)
+Isso implica: nL = C    e    yhat (C, 1)
+(Generalização da Regressão Logística para C classes)
+
+Activation function (camada softmax):
+	t = e^(ZL)		(C, 1) [element-wise]
+	aL = e^(zL) / sum(t_i)	
+	ou seja: aL_i = t_i / sum(t_i)
+
+Loss Function:
+	L(yhat, y) = - sum(y_j * log(yhat_j) para j até C)
+	J(W1, b1, ...) = sum(L(yhat, y)) / m
+
+Backprop:
+	dZL = yhat - y 		(C,1)
+	... (framework)
+
+-> Introduction to Programming Frameworks
+
+[Deep Learning Frameworks]
+	- caffe/caffe2
+	- CNTK
+	- DL4J
+	- Keras
+	- Lasagne
+	- mxnet
+	- PaddlePaddle
+	- TensorFlow
+	- Theano
+	- Torch
+
+Como escolher?
+	- Facilidade na programação (dev e deploy)
+	- Desempenho/Velocidade (Running Speed)
+	- Código aberto com boa administração
+
+[TensorFlow]
+Problema exemplo:
+	minimizar J(w) = w^2 - 10*w + 25 = (w - 5)^2
+Código:
+	import numpy as np
+	import tensorflow as tf
+
+	w = tf.Variable(0, dtype=tf.float32)
+	#cost = tf.add(tf.add(w**2, tf.multiply(-10,w), 25))
+	cost = w**2 - 10*w + 25
+	train = tf.train.GradientDescentOptimizer(0.01).minimize(cost)
+
+	init = tf.global_variables_initializer()
+	session = tf.Session()
+	session.run(init)
+	print(session.run(w))
+
+	session.run(train)
+	print(session.run(w))
+
+	for i in range(1000):
+		session.run(train)
+	print(session.run(w))
+
+Com dados dinâmicos:
+	import numpy as np
+	import tensorflow as tf
+
+	coefficients = np.array([[1.], [-10.], [25.]])
+
+	w = tf.Variable(0, dtype=tf.float32)
+	x = tf.placeholder(tf.float32, [3,1])
+	cost = x[0][0] * w ** 2 + x[1][0] * w + x[2][0]
+	train = tf.train.GradientDescentOptimizer(0.01).minimize(cost)
+
+	init = tf.global_variables_initializer()
+	session = tf.Session()
+	session.run(init)
+	print(session.run(w))
+
+	session.run(train, feed_dict={x:coefficients})
+	print(session.run(w))
+
+	for i in range(1000):
+		session.run(train, feed_dict={x:coefficients})
+	print(session.run(w))

@@ -1,0 +1,200 @@
+NEURAL NETWORKS AND DEEP LEARNING
+
+
+
+Introduction to Deep Learning
+
+[What is a Neural Network]
+Aprendizagem profunda (deep learning) se refere ao treinamento de redes neurais normalmente muito grandes (muitas camadas)
+Podemos pensar em uma regressão linear como uma rede neural utilizando apenas um "neurônio"
+Função comum em redes neurais: ReLU (Rectified Linear Unit)
+
+[Supervised Learning with Neural Networks]
+Em dados não estruturados:
+	Para classificações de imagem normalmente se usa Redes Neurais Convolucionais
+	Para classificações de áudio (e traduções) normalmente se usa Redes Neurais Recorrentes
+
+[Why is Deep Learning Taking Off?]
+Conforme a quantidade de dados disponíveis aumenta, as Redes Neurais (em especial as grandes) possuem alta performance quando comparadas a outros algoritmos usados em aprendizado supervisionado
+(escalabilidade)
+
+
+
+Neural Networks Basics
+
+-> Logistic Regression as a Neural Network
+
+[Binary Classification]
+Classificação para 2 classes
+Conveções: 
+	para NN teremos a convenção de usar a matriz X com os x_i colocados em colunas (isso é, matriz de dimensão n x m) 
+	da mesma forma, teremos y de dimensão 1 x m
+
+[Logistic Regression]
+Dado x, queremos y_hat = P(y=1|x) = sigmoid(z) = 1 / (1 + e^-z)
+Onde z = w' * x + b
+(b = theta_0 e w = theta_{1:n})
+
+[Logistic Regression Cost Function]
+Loss (error) function: 
+	L(y_hat, y) = - (y * log(y_hat) + (1-y) * log(1 - y_hat))
+Cost function:
+	J(w,b) = sum(L(y_hat_i, y_i) com i de 1 até m) / m
+
+[Gradient Descent]
+Minimizar J(w,b) de acordo com w e b
+	w = w - alpha * dJ(w,b)/dw
+	b = b - alpha * dJ(w,b)/db
+
+-> Python and Vectorization
+
+[Vectorization]
+Em python, após importar numpy como np, podemos vetorizar o cálculo de z:
+	z = np.dot(w,x) + b
+
+[More Vectorization Examples]
+Element-wise:
+	np.exp(v)
+	np.log(v)
+	np.abs(v)
+	np.maximum(v,0)
+	v**z
+	1/v
+
+[Vectorizing Logistic Regression]
+Z = np.dot(w.T,x) + b
+A = sigmoid(Z)
+
+[Vectorizing Logistic Regression's Gradient Output] (backpropagation)
+dZ = A - Y
+db = np.sum(dZ) / m
+dw = np.dot(X, dZ.T)
+
+
+
+Shallow Neural Networks
+
+Para uma NN de 2 camadas (1 Hidden Layer), podemos fazer o forward propagation para as m entradas (x_i) da seguinte forma:
+X = [x_1 x_2 ... x_m]
+Z1 = W1 * X + b1
+A1 = g(Z1)
+Z2 = W2 * A1 + b2
+A2 = g(Z2)
+
+[Activation Functions]
+g(z) pode ser:
+	sigmoid(z) = 1 / (1 + e^-z)
+		-> melhor para a camada de saída (Output Layer), uma vez que a resposta deve estar entre 0 e 1
+	tanh(z) = (e^z - e^-z) / (e^z + e^-z)
+		-> geralmente funciona melhor que a sigmoid para as Hidden Layers da NN por possuir média 0 (valores entre -1 e 1)
+	ReLU(z) = max(0,z)
+		-> geralmente funciona melhor que a tanh para as Hidden Layers da NN (mais indicada)
+	Leaky ReLU(z) = max(0.01 * z, z)
+		-> geralmente funciona melhor que a ReLU mas não é muito usada na prática
+
+Se g(z) = z para todas as camadas, então a NN é equivalente a uma regressão linear
+
+[Derivatives of Activation Functions]
+sigmoid: g'(z) = g(z) * (1 - g(z))
+tanh: g'(z) = 1 - tanh(z)^2
+ReLU: 	
+	g'(z) = 0 (se z < 0)
+	g'(z) = 1 (se z > 0)
+	g'(z) = undefined (se z = 0)	[na prática pode ser igual a 1 ou 0]
+Leaky ReLU:
+	g'(z) = 0.01 (se z < 0)
+	g'(z) = 1 (se z > 0)
+	g'(z) = undefined (se z = 0)	[na prática pode ser igual a 1 ou 0]
+
+[Gradient Descent for NN]
+Para 1 Hidden Layer:
+	J(W1, b1, W2, b2) = L(y_hat, y) / m
+
+	Gradient descent:
+		Repeat {
+			Compute predicts (y_hat_i  para i de 1 até m)	[Forward Propagation]
+			dW1 = dJ/dW1; db1 = dJ/db1; dW2 = dJ/dW2; db2 = dJ/db2	[Back Propagation]
+			W1 = W1 - alpha * dW1
+			b1 = b1 - alpha * db1
+			W2 = W2 - alpha * dW2
+			b2 = b2 - alpha * db2
+		}
+
+	Forward Propagation: 
+		Z1 = W1 * X + b1
+		A1 = g(Z1)
+		Z2 = W2 * A1 + b2
+		A2 = g(Z2)
+
+	Back Propagation:
+		dZ2 = A2 - Y
+		dW2 = dZ2 * A1.T / m
+		db2 = np.sum(dZ2, axis = 1, keepdims = True) / m
+		dZ1 = W2.T * dZ2 x g1'(Z1)
+				(onde x é element-wise product)
+		dW1 = dZ1 * X.T / m
+		db1 = np.sum(dZ1, axis = 1, keepdims = True) / m
+
+É necessário inicializar os pesos W com valores aleatórios pequenos antes de executar o gradiente decrescente
+
+
+
+Deep Neural Network
+
+"Deep" se dá pela maior quantidade de Hidden Layers
+L = # de camadas (sem contar a camada de input x)
+nl = # de unidades na camada l
+al = ativações da camada l = gl(zl)
+wl = pesos para computar zl
+
+[Forward Propagation]
+Dado x = x_i:
+	z1 = W1 * x + b1 = W1 * a0 + b1
+	a1 = g1(z1)
+	z2 = W2 * a1 + b2
+	a2 = g2(z2)
+	...
+	zL = WL * a{L-1} + bL = yhat
+
+	Genericamente, para cada camada l: 
+		zl = Wl * a{l-1} + bl
+		al = gl(zl)
+
+Versão vetorizada:
+	Z1 = W1 * X + b1 = W1 * A0 + b1
+	A1 = g1(Z1)
+	Z2 = W2 * A1 + b2
+	A2 = g2(Z2)
+	...
+	AL = gL(ZL) = Yhat
+
+	Genericamente, para cada camada l:
+		Zl = Wl * A{l-1} + bl
+		Al = gl(Zl)
+
+[Getting your Matrix Dimensions Right]
+Wl: (nl, n{l-1})
+bl: (nl, 1)
+dWl: (nl, n{l-1})
+dbl: (nl, 1)
+
+Zl: (nl, m)
+Al: (nl, m)
+dZl: (nl, m)
+dAl: (nl, m)
+
+[Forward and Backward Propagation]
+Forward Propagation:
+	(input a{l-1}, output al, cache zl)
+	Zl = Wl * A{l-1} + bl
+	Al = gl(Zl)
+Backward Propagation:
+	(input dal, output da{l-1}, dWl, dbl)
+	dZl = dAl x gl'(Zl)
+	dWl = dZl * A{l-1}.T / m
+	dbl = np.sum(dZl, axis = 1, keepdims = True) / m
+	dA{l-1} = Wl.T * dZl
+
+[Parameters vs Hyperparameters]
+Parameters: W1, b1, W2, b2, ..., WL, bL
+Hyperparameters: alpha, # iterações, L (# de hidden layers), # hidden units (n1, n2, ...), escolha de funções de ativação   (é necessário experimentar vários valores)
