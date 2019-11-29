@@ -1,0 +1,68 @@
+CONVOLUTIONAL NEURAL NETWORKS
+
+
+
+Foundations of Convolutional Neural Networks
+
+[Computer Vision]
+Exemplos:
+    - Classificação de imagens -> é a foto de um gato ou não?
+    - Detecção de objetos -> posição de um ou mais carros em uma imagem
+    - Neural Style Transfer -> "composição" entre duas imagens, uma contendo uma foto e outra contendo algum estilo para ser aplicado
+
+Em imagens grandes (1000x1000 pixels) teremos milhões de unidades na camada de entrada, o que implica W1 com bilhões de parâmetros
+    -> O treinamento fica computacionalmente inviável e se torna difícil previnir o overfitting por conta da grande quantidade de features
+
+Para Visão Computacional, queremos poder treinar com imagens muito grandes e isso pode ser feito através do processo de convolução
+
+[Edge Detection Example]
+Ideia básica para detectar linhas verticais ou horizontais:
+    - Criar um filtro (kernel) na forma [[1 0 -1] [1 0 -1] [1 0 -1]]   (detecção de linha vertical)
+    - Fazer a convolução (*) entre o filtro (3x3) e a imagem (6x6) gerando uma matriz (4x4)
+        -> Multiplicação elemento a elemento entre o filtro e a submatriz e soma entre todos os elementos
+
+Convolução:
+    - Python: conv_forward
+    - Tensorflow: tf.nn.conv2d
+    - Keras: Conv2D
+
+[More Edge Detection]
+ A matriz resultante possui valores muito grandes ou muito pequenos nos locais em que a convolução foi feita com uma linha vertical (pode pegar o valor absoluto)
+ Outros filtros:
+    - Sobel filter: [[1 0 -1] [2 0 -2] [1 0 -1]]  (coloca mais peso nos pixels centrais)
+    - Scharr filter: [[3 10 -3] [10 0 -10] [3 0 -3]]
+
+Para o aprendizado, tornamos os valores do filtro parâmetros w1, ..., w9 para que o algoritmo aprenda o melhor filtro para a classificação
+
+[Padding]
+Modificação no algoritmo de convolução para facilitar o manuseio das matrizes resultantes
+Dimensões:
+    - imagem: nxn
+    - filtro: fxf
+    - convolução: n-f+1 x n-f+1
+
+Desvantagens: 
+    - toda vez que um filtro é aplicado a matriz diminui
+    - alguns pixels são usados na computação de várias células e alguns são usados apenas uma vez
+
+Para solucionar esses problemas basta incluir uma borda de p pixels com zeros na imagem original antes de realizar a convolução
+
+Valid Convolution: sem padding  (n-f+1 x n-f+1)
+Same Convolution: com padding para que a imagem de entrada tenha o mesmo tamanho da imagem de saída  
+    (n+2p-f+1 x n+2p-f+1) = (n x n)  
+    =>  p = (f - 1) / 2   [f normalmente é ímpar]
+
+[Strided Convolutions]
+Exemplo: Stride = 2
+    No lugar de computar os produtos e somas a cada 1 pixel, pulamos de 2 em 2
+
+Dimensões:
+    - imagem: nxn
+    - filtro: fxf
+    - padding: p
+    - stride: s
+    -> resultado: floor(1 + (n+2p-f) / s)   x   floor(1 + (n+2p-f) / s)
+
+OBS: Em livros de matemática a definição formal de convolução diz que antes de realizarmos a convolução e necessário rotacionar a matriz do filtro no sentido horário e espelhá-la no sentido vertical
+    -> Esse processo é feito para que a convolução seja associativa   [essa propriedade não importará para as aplicações de NN]
+    -> Tecnicamente o que fizemos antes é chamado de correlação cruzada, não convolução (mas a convenção em Deep Learning é chamar de convolução)
