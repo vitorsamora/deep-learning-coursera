@@ -63,6 +63,6 @@ Dimensões:
     - stride: s
     -> resultado: floor(1 + (n+2p-f) / s)   x   floor(1 + (n+2p-f) / s)
 
-OBS: Em livros de matemática a definição formal de convolução diz que antes de realizarmos a convolução e necessário rotacionar a matriz do filtro no sentido horário e espelhá-la no sentido vertical
+OBS: Em livros de matemática a definição formal de convolução diz que antes de realizarmos a convolução e necessário espelhar (flip) a matriz do filtro no sentido vertical e depois espelhá-la no sentido horizontal
     -> Esse processo é feito para que a convolução seja associativa   [essa propriedade não importará para as aplicações de NN]
     -> Tecnicamente o que fizemos antes é chamado de correlação cruzada, não convolução (mas a convenção em Deep Learning é chamar de convolução)
