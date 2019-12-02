@@ -214,7 +214,7 @@ Isso implica: nL = C    e    yhat (C, 1)
 (Generalização da Regressão Logística para C classes)
 
 Activation function (camada softmax):
-	t = e^(ZL)		(C, 1) [element-wise]
+	t = e^(zL)		(C, 1) [element-wise]
 	aL = e^(zL) / sum(t_i)	
 	ou seja: aL_i = t_i / sum(t_i)
 

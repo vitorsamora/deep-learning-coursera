@@ -153,7 +153,7 @@ Image 	Dog		Great Cat 	Blurry	Instagram	Comments
 ...		
 %		8%		43%			61%		12%
 
-O resultado implica que não valeria muito a pena gastar recursos em melhorar o classificador para os casos de cães e filtros do Instagram
+O resultado implica que não valeria muito a pena gastar recursos para melhorar o classificador para os casos de cães e filtros do Instagram
 
 [Cleaning Up Incorrectly Labeled Data]
 Amostras classificadas de forma incorreta no conjunto de treinamento:
@@ -206,7 +206,7 @@ Exemplo: Imagens de gatos
 	Suponhamos que o erro humano (Bayes) ~ 0%
 	Erro de treino: 1%
 	Erro dev: 10%
-	Antes diríamos que esse é um problema de variância, mas como as distribuições são diferentes, não necessariamente essa é a conclusão correta a ser tomada
+	Antes diríamos que esse é um problema de variância, mas como as distribuições são diferentes, não necessariamente essa é a conclusão correta
 
 Definição de outro conjunto de dados que ajudará na avaliação:
 	Conjunto training-dev: Mesma distribuição que o conjunto de treinamento, mas não é usado para treino
@@ -226,7 +226,7 @@ Não existem soluções sistemáticas para resolver esse problema, mas algumas t
 	- Realizar análise manual dos erros para tentar entender as diferenças entre os conjuntos
 	- Tornar os dados de treinamento mais parecidos com os conjuntos dev/test (síntese artificial de dados), ou coletar mais dados parecidos com os conjuntos dev/test
 
-OBS: O algoritmo pode sobreajustar (overfit) um subconjunto gerado pela síntese artificial de dados
+OBS: O algoritmo pode sobreajustar (overfit) um subconjunto gerado pela síntese artificial de dados dependendo como os dados forem gerados
 
 -> Learning From Multiple Tasks
 

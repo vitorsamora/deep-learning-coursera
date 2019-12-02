@@ -108,7 +108,7 @@ Leaky ReLU:
 
 [Gradient Descent for NN]
 Para 1 Hidden Layer:
-	J(W1, b1, W2, b2) = L(y_hat, y) / m
+	J(W1, b1, W2, b2) = sum(L(y_hat, y)) / m
 
 	Gradient descent:
 		Repeat {
