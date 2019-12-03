@@ -66,3 +66,250 @@ Dimensões:
 OBS: Em livros de matemática a definição formal de convolução diz que antes de realizarmos a convolução e necessário espelhar (flip) a matriz do filtro no sentido vertical e depois espelhá-la no sentido horizontal
     -> Esse processo é feito para que a convolução seja associativa   [essa propriedade não importará para as aplicações de NN]
     -> Tecnicamente o que fizemos antes é chamado de correlação cruzada, não convolução (mas a convenção em Deep Learning é chamar de convolução)
+
+[Convolutions Over Volume]
+Convolução para RGB (3 dimensões):
+    - imagem: 6x6x3 [altura, largura, # canais (profundidade)]
+    - filtro: 3x3x3
+    - convolução: 4x4x1
+No lugar de computar um valor para cada submatriz de 3x3 para a convolução (como no exemplo anterior), multiplicamos elemento a elemento os "subcubos" da imagem com o cubo do filtro e somamos (os 3*3*3 = 27 valores) para computar uma entrada na matriz de convolução
+OBS: Podemos fazer a convolução da imagem com diversos filtros e enfileirar os resultados em uma única saída
+
+Genericamente:
+    - imagem: n x n x n_c [número de canais]
+    - filtro: f x f x n_c
+    - convolução: n - f + 1 x n - f + 1 x n_f [número de filtros]
+
+[One Layer of a Convolutional Network]
+Exemplo:
+    - imagem: 6x6x3
+    - filtros (2 filtros): 3x3x3
+    - convolução 
+        -> gera duas matrizes c1 e c2 de 4x4 
+        -> fazemos o cálculo de a1_1 e a1_2  
+            - a1_1 = ReLU(c1 + b1) (b1 e b2 vetores de bias, equivalente a: a_1 = sigmoid(W1 * a0 + b1))
+            - a1_2 = ReLU(c2 + b2)
+    - saída: a1 = [a_1, a_2] 4x4x2  (próxima camada da rede)
+
+Resumo da notação para uma camada l de convolução:
+    - fl: tamanho do filtro
+    - pl: padding
+    - sl: stride
+    - entrada: n_h{l-1} x n_w{l-1} x n_c{l-1}
+    - saída: n_hl x n_wl x n_cl
+        -> n_hl = floor(1 + (n_h{l-1} + 2*pl - fl) / sl)
+        -> n_wl = floor(1 + (n_w{l-1} + 2*pl - fl) / sl)
+    - cada filtro é: fl x fl x n_c{l-1}
+    - ativações: n_hl x n_wl x n_cl   =>  Al é m x n_hl x n_wl x n_cl
+    - pesos (W): fl x fl x n_c{l-1} x n_cl
+    - bias (b): n_cl  ->  (1,1,1,n_cl)
+
+[Simple Convolutional Network Example]
+Exemplo:
+    - imagem: 39x39x3
+        -> n_h0 = n_w0 = 39; n_c0 = 3
+        -> fl = 3, sl = 1, p1 = 0, 10 filtros
+    - saída da camada 1: 1 + (n + 2*p - f)/s = 37
+        -> n_h1 = n_w1 = 37
+        -> n_c1 = 10
+    - camada 2:
+        -> f2 = 5, s2 = 2, p2 = 0, 20 filtros
+    - saída da camada 2:
+        -> n_h1 = n_w1 = 17
+        -> n_c1 = 20
+     - camada 3:
+        -> f2 = 5, s2 = 2, p2 = 0, 40 filtros
+    - saída da camada 3:
+        -> n_h1 = n_w1 = 7
+        -> n_c1 = 40
+    - unroll da saída da camada 3
+    - camada softmax / regressão logística
+    - saída yhat
+
+Tipos de camadas em uma CNN:
+    - convolution (CONV)
+    - pooling (POOL)
+    - fully conected (FC)
+
+[Pooling Layers]
+Usadas para reduzir o tamanho da representação, acelerar a computação e tornar as features de detecção mais robustas
+
+Exemplo de pooling: Max Pooling
+    - entrada: 4x4
+    - saída: 2x2
+    -> divide a matriz de entrada em 4 submatrizes e pega o máximo de cada região  (s = 2, f = 2)
+    -> intuição: valores grandes indicam a ativação de alguma feature
+    -> vantagem: dados f e s (hiperparâmetros) não necessita de outros parâmetros
+
+Outro exemplo: Average Pooling
+    -> a mesma coisa só que usando a média no lugar do máximo
+
+OBS: por si só uma camada de pooling não é considerada uma camada da NN por não possuir pesos associados
+
+[CNN Example]
+(Exemplo inspirado na LeNet-5)
+Entrada: imagem de 32x32x3 (RGB)
+Objetivo: identificar números na imagem
+Camada 1:
+    CONV1:
+        f = 5, s = 1, 6 filtros
+    Saída da CONV1: 28x28x6
+    POOL1 (MaxPool):
+        f = 2, s = 2, 6 filtros
+    Saída da POOL1 (MaxPool): 14x14x6
+Camada 2:
+    CONV2:
+        f = 5, s = 1, 16 filtros
+    Saída da CONV2: 10x10x16
+    POOL2 (MaxPool):
+        f = 2, s = 2, 16 filtros
+    Saída da POOL2 (MaxPool): 5x5x16
+Saída da segunda camada após unroll: 400x1
+Camada 3: (FC3) -> camada padrão dos últimos cursos
+    W3 é (120,400)
+    b3 é (120,1)
+Saída da camada 3: 120x1
+Camada 4: (FC4) -> camada padrão dos últimos cursos
+    W3 é (84,120)
+    b3 é (84,1)
+Saída da camada 4: 84x1
+Camada 5: softmax
+    W3 é (10,84)
+    b3 é (10,1)
+Saída da camada 5: 10x1   (0,1,...,9)
+
+-> Conforme a profundidade da CNN vai aumentando os tamanhos n_h e n_w vão diminuindo (e n_c vai aumentando)
+-> Padrão comum de CNN: CONV (1 ou mais) -> POOL -> CONV (1 ou mais) -> POOL -> FC -> FC -> FC -> Softmax
+
+[Why Convolutions]
+Exemplo:
+    Entrada: 32x32x3 = 3072
+        f = 5, 6 filtros
+        Cada feature é 5x5 = 25
+        Mais 1 parâmetro do bias
+        (fl x fl x n_c{l-1} + 1) x n_cl = (5x5x3 + 1) x 6 = 456
+    Saída: 28x28x6 = 4704
+    (Se fosse camada FC, W teria dimensão 3072x4704 ~ 14M)
+
+-> Compartilhamento de parâmetros: um detector de features (como um detector de linhas verticais) que é útil em uma parte da imagem provavelmente também é útil em outras partes
+-> Esparsidade de conexões: Em cada camada, cada valor de saída depende apenas de um número pequeno de entradas
+
+
+
+Deep Convolutional Models: Case Studies
+
+[Why Look at Case Studies?]
+-> Para ganhar intuição na criação de redes neurais convolucionais
+
+Redes Clássicas:
+    - LeNet-5
+    - AlexNet
+    - VGG
+
+ResNet (152 camadas)
+
+[Classic Networks]
+-> LeNet-5: (Parecida com a arquitetura desenvolvida na semana anterior)        [LeCun et al., 1998. Gradient based learning applied to documento recognition]
+    - Reconhecimento de dígitos (0-9)
+    - Imagem (32x32x1) -> [5x5, s=1] CONV (28x28x6) -> [f=2, s=2] POOL_AVG (14x14x6) -> [5x5, s=1] CONV (10x10x16) -> [f=2, s=2] POOL_AVG (5x5x16) -> FC (120) -> FC (84) -> yhat (10) [softmax]
+    - 60k de parâmetros
+    - Na época não era usado padding, então a dimensão ia diminuindo a cada camada e o número de canais ia aumentando
+    OBS: Na época do paper eram usadas as funções de ativação sigmoid e tanh
+    OBS2: Não linearidade após a camada POOL
+
+-> AlexNet:     [Krizhevsky et al., 2012. ImageNet classification with deep convolutional neural networks]
+    - Camadas: 
+        -> Imagem (227x227x3) 
+        -> [11x11, s=4] CONV (55x55x96) 
+        -> [3x3, s=2] MAXPOOL (27x27x96) 
+        -> [5x5, same] CONV (27x27x256) 
+        -> [3x3, s=2] MAXPOOL (13x13x256)
+        -> [3x3, same] CONV (13x13x384)
+        -> [3x3] CONV (13x13x384)
+        -> [3x3] CONV (13x13x256)
+        -> [3x3, s=2] MAXPOOL (6x6x256)
+        -> FC [unroll] (9216)
+        -> FC (4096)
+        -> FC (4096)
+        -> Softmax (1000)
+    - Parecida com a LeNet, mas muito maior
+    - 60M de parâmetros
+    - ReLU
+    OBS: Multiple GPU
+    OBS2: Local Response Normalization
+
+-> VGG-16: (16 camadas com parâmetros)     [Simonyan & Zisserman, 2015. Very deep convolutional networks for large-scale image recognition]
+    - Camadas de convolução no padrão: filtro 3x3, s = 1, same
+    - Camadas de max-pooling no padrão: filtro 2x2, s = 2
+    - Camadas:
+        -> Imagem (224x224x3)
+        -> CONV com 64 filtros (224x224x64)
+        -> CONV com 64 filtros (224x224x64)
+        -> MAXPOOL (112x112x64)
+        -> CONV com 128 filtros (112x112x128)
+        -> CONV com 128 filtros (112x112x128)
+        -> MAXPOOL (56x56x128)
+        -> CONV com 256 filtros (56x56x256)
+        -> CONV com 256 filtros (56x56x256)
+        -> CONV com 256 filtros (56x56x256)
+        -> MAXPOOL (28x28x256)
+        -> CONV com 512 filtros (28x28x512)
+        -> CONV com 512 filtros (28x28x512)
+        -> CONV com 512 filtros (28x28x512)
+        -> MAXPOOL (14x14x512)
+        -> CONV com 512 filtros (14x14x512)
+        -> CONV com 512 filtros (14x14x512)
+        -> CONV com 512 filtros (14x14x512)
+        -> MAXPOOL (7x7x512)
+        -> FC (4096)
+        -> FC (4096)
+        -> Softmax (1000)
+    - 138M de parâmetros
+
+[ResNets]
+Redes neurais extremamente profundas são dificeis de treinar por conta do desaparecimento/explosão de gradientes
+Usando "skip connections" podemos contruir uma ResNet (Residual Net), que possibilita o treinamento de redes neurais extremamente profundas (100+ camadas)
+Residual block: 
+    -> A ideia basicamente é colocar uma ativação al no cálculo da ativação de a{l+2} da forma:   ("atalho"/"skip connection" no fluxo)
+        a{l+2} = g(z{l+2} + al)
+
+[Why ResNets Work]
+Se incluirmos um "residual block" no final de uma grande rede neural a performance não será afetada, pois com a "skip connection" o bloco pode facilmente aprender a função identidade, retornando as mesmas ativações retornadas pela rede neural anterior ao bloco (essa propriedade é difícil de ser aprendida sem a utilização do bloco residual)
+
+[Networks in Networks and 1x1 Convolutions]
+Convolução com um filtro 1x1 -> multiplicação por escalar
+Convolução com c filtros 1x1 -> multiplicação entre "vetores" de dimensão c (gerando um único valor a ser passado pela ReLU)   [operação não-trivial]
+Pode ser usado para aumentar ou diminuir o número de canais
+
+[Inception Network Motivation]
+Inception: Usar diversos tamanhos de filtros e tanto CONV quanto MAXPOOL na mesma camada
+    -> Custo computacional grande (exemplo com filtro 5x5)
+        - 28x28x192 -> CONV com 32 filtros de 5x5 -> 28x28x32 (~120M de multiplicações)
+    -> Para reduzir o número de multiplicações podemos usar a "bottleneck layer" para obter "o mesmo" resultado da convolução com filtro de 5x5
+        - 28x28x192 -> CONV com 16 filtros de 1x1 -> 28x28x16 -> CONV com 32 filtros de 5x5 -> 28x28x32 (~12M de multiplicações)
+
+[Inception Network]
+Inception module:
+    Ativação anterior (28x28x192) 
+        '-> [64 filtros 1x1] CONV (28x28x64)
+        '-> [96 filtros 1x1] CONV (28x28x96) -> [128 filtros 3x3] CONV (28x28x128)
+        '-> [16 filtros 1x1] CONV (28x28x16) -> [32 filtros 5x5] CONV (28x28x32)
+        '-> [3x3, s=1, same] MAXPOOL (28x28x192) -> [32 filtros 1x1] CONV (28x28x32)
+    Concatenação de canais: (28x28x256) [Concatenar todos os anteriores]
+Inception network é basicamente a combinação de diversos incepton modules
+
+[Transfer Learning]
+É possível encontrar no github diversas implementações de redes neurais com os pesos ótimos calculados
+Dependendo da aplicação, podemos considerar uma transferência de aprendizado removendo a última camada (normalmente softmax) e "plugando" uma nova camada softmax no lugar contendo as classes de interesse
+
+Para datasets pequenos:
+    Os pesos dados pela rede baixada devem ser "congelados"
+    Isso é, só devemos treinar a rede rasa dada pela saída desse pré-processamento com a nossa camada softmax
+
+Para datasets médios:
+    Congelamos menos camadas (as mais baixas) dadas pela rede neural baixada e treinamos as outras junto com a nossa camada softmax
+    Ou descartamos as últimas camadas não congeladas e criamos as nossas próprias
+
+Quando você tem muitos dados:
+    Descartar a última camada (softmax) e incluir uma contendo a quantidade de classes do seu dataset
+    Usar os pesos baixados como inicialização e treinar a rede neural inteira
