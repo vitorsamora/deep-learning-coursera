@@ -19,7 +19,7 @@ Para Visão Computacional, queremos poder treinar com imagens muito grandes e is
 Ideia básica para detectar linhas verticais ou horizontais:
     - Criar um filtro (kernel) na forma [[1 0 -1] [1 0 -1] [1 0 -1]]   (detecção de linha vertical)
     - Fazer a convolução (*) entre o filtro (3x3) e a imagem (6x6) gerando uma matriz (4x4)
-        -> Multiplicação elemento a elemento entre o filtro e a submatriz e soma entre todos os elementos
+        -> Multiplicação elemento a elemento entre o filtro e cada submatriz 3x3 e soma entre todos os elementos
 
 Convolução:
     - Python: conv_forward
@@ -73,7 +73,7 @@ Convolução para RGB (3 dimensões):
     - filtro: 3x3x3
     - convolução: 4x4x1
 No lugar de computar um valor para cada submatriz de 3x3 para a convolução (como no exemplo anterior), multiplicamos elemento a elemento os "subcubos" da imagem com o cubo do filtro e somamos (os 3*3*3 = 27 valores) para computar uma entrada na matriz de convolução
-OBS: Podemos fazer a convolução da imagem com diversos filtros e enfileirar os resultados em uma única saída
+OBS: Podemos fazer a convolução da imagem com diversos filtros e enfileirar (como se fossem canais) os resultados em uma única saída
 
 Genericamente:
     - imagem: n x n x n_c [número de canais]
@@ -108,20 +108,20 @@ Resumo da notação para uma camada l de convolução:
 Exemplo:
     - imagem: 39x39x3
         -> n_h0 = n_w0 = 39; n_c0 = 3
-        -> fl = 3, sl = 1, p1 = 0, 10 filtros
+        -> f1 = 3, s1 = 1, p1 = 0, 10 filtros
     - saída da camada 1: 1 + (n + 2*p - f)/s = 37
         -> n_h1 = n_w1 = 37
         -> n_c1 = 10
     - camada 2:
         -> f2 = 5, s2 = 2, p2 = 0, 20 filtros
     - saída da camada 2:
-        -> n_h1 = n_w1 = 17
-        -> n_c1 = 20
+        -> n_h2 = n_w2 = 17
+        -> n_c2 = 20
      - camada 3:
-        -> f2 = 5, s2 = 2, p2 = 0, 40 filtros
+        -> f3 = 5, s3 = 2, p3 = 0, 40 filtros
     - saída da camada 3:
-        -> n_h1 = n_w1 = 7
-        -> n_c1 = 40
+        -> n_h3 = n_w3 = 7
+        -> n_c3 = 40
     - unroll da saída da camada 3
     - camada softmax / regressão logística
     - saída yhat
@@ -209,7 +209,7 @@ Redes Clássicas:
 ResNet (152 camadas)
 
 [Classic Networks]
--> LeNet-5: (Parecida com a arquitetura desenvolvida na semana anterior)        [LeCun et al., 1998. Gradient based learning applied to documento recognition]
+-> LeNet-5: (Parecida com a arquitetura desenvolvida na semana anterior)        [LeCun et al., 1998. Gradient based learning applied to document recognition]
     - Reconhecimento de dígitos (0-9)
     - Imagem (32x32x1) -> [5x5, s=1] CONV (28x28x6) -> [f=2, s=2] POOL_AVG (14x14x6) -> [5x5, s=1] CONV (10x10x16) -> [f=2, s=2] POOL_AVG (5x5x16) -> FC (120) -> FC (84) -> yhat (10) [softmax]
     - 60k de parâmetros
@@ -270,7 +270,7 @@ ResNet (152 camadas)
 Redes neurais extremamente profundas são dificeis de treinar por conta do desaparecimento/explosão de gradientes
 Usando "skip connections" podemos contruir uma ResNet (Residual Net), que possibilita o treinamento de redes neurais extremamente profundas (100+ camadas)
 Residual block: 
-    -> A ideia basicamente é colocar uma ativação al no cálculo da ativação de a{l+2} da forma:   ("atalho"/"skip connection" no fluxo)
+    -> A ideia basicamente é colocar uma ativação al no cálculo da ativação de a{l+2} da forma:   (um "atalho"/"skip connection" no fluxo)
         a{l+2} = g(z{l+2} + al)
 
 [Why ResNets Work]
@@ -313,3 +313,37 @@ Para datasets médios:
 Quando você tem muitos dados:
     Descartar a última camada (softmax) e incluir uma contendo a quantidade de classes do seu dataset
     Usar os pesos baixados como inicialização e treinar a rede neural inteira
+
+[Data Augmentation]
+Técnica normalmente usada em visão computacional para melhorar a performance -> Quanto mais dados melhor
+Exemplos:
+    -> Espelhar horizontalmente a imagem original
+    -> Cortes aleatórios na imagem original (não é perfeito)
+    -> Rotações na imagem original
+    -> "Shearing"
+    -> "Local Warping"
+    -> "Color shifting"  (R <- +20; G <- -20; B <- +20)  [simulação de diferentes iluminações]
+        - É possível usar PCA para escolher os vetores para alterar os valores RGB  [PCA color augmentation]
+
+Também existem hiperparâmetros para essas alterações nas imagens originais
+
+[State of Computer Vision]
+Data vs. Hand-engineering:
+    - Object Detection: Poucos dados disponíveis (mais desenvolvimento manual [hand-engineering, "hacks"] / transfer learning)
+    - Image Recognition: Quantidade média de dados diponíveis
+    - Speech Recognition: Grande quantidade de dados disponíveis (menos desenvolvimento manual / algoritmos mais simples)
+
+Duas fontes de conhecimento:
+    - Dados classificados [labeled]  (X, Y)
+    - Hand engineered features / network architecture / other components
+
+Dicas para benchmarks/competições:  [não é recomendado usar em produção]
+    -> Ensembling: Treinar diversas redes (3 a 15) de forma independente e tirar a média das saídas (yhat)
+    -> Multi-crop at test time: Rodar o classificador em múltiplas versões (cortes aleatórios) de imagens de teste e tirar a média dos resultados
+        - Exemplo: 10-crop
+
+Usar código aberto
+    - Usar arquiteturas de redes publicadas em artigos/livros
+    - Usar implementações de código aberto, se possível
+    - Usar modelos pré-treinados e refiná-los para o seu dataset
+    
