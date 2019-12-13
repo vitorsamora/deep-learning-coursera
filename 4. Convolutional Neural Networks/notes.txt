@@ -27,7 +27,7 @@ Convolução:
     - Keras: Conv2D
 
 [More Edge Detection]
- A matriz resultante possui valores muito grandes ou muito pequenos nos locais em que a convolução foi feita com uma linha vertical (pode pegar o valor absoluto)
+ A matriz resultante possui valores muito grandes ou muito pequenos (negativos) nos locais em que a convolução foi feita com uma linha vertical (pode pegar o valor absoluto)
  Outros filtros:
     - Sobel filter: [[1 0 -1] [2 0 -2] [1 0 -1]]  (coloca mais peso nos pixels centrais)
     - Scharr filter: [[3 10 -3] [10 0 -10] [3 0 -3]]
@@ -346,4 +346,150 @@ Usar código aberto
     - Usar arquiteturas de redes publicadas em artigos/livros
     - Usar implementações de código aberto, se possível
     - Usar modelos pré-treinados e refiná-los para o seu dataset
+
+
+
+Detection Algorithms
+
+[Object Localization]
+Detecção de um objeto:
+    - Classificação: tem carro na imagem ou não?
+    - Classificação com localização: tem carro na imagem ou não? Se tiver, localização com uma bounding box
+
+Detecção de múltiplos objetos (uma ou mais categorias):
+    - Detecção: muitos carros, localizados com bounding boxes
+
+Exemplo de classificação com localização:
+    Classes:
+        1 - pedestre
+        2 - carro
+        3 - moto
+        4 - background
     
+    Saída:
+        - Camada softmax com as probabilidades para as classes
+        - bx, by, bh, bw (bounding box)
+
+    y = [pc, bx, by, bh, bw, c1, c2, c3]
+        pc - existe algum objeto (de alguma das classes (1,2,3))?
+        bx - coordenada x do ponto central do objeto
+        by - coordenada y do ponto central do objeto
+        bh - altura do objeto
+        bw - largura do objeto
+        c1 - pedestre
+        c2 - carro
+        c3 - moto
+
+    Loss simplificado (square error):
+        L(yhat, y) = (yhat_1 - y_1)^2 + ... + (yhat_8 - y_8)^2   se y_1 = 1
+        L(yhat, y) = (yhat_1 - y_1)^2                            se y_1 = 0
+
+    O mais natural seria usarmos o Loss de regressão logística para pc, square error para (bx,by,bh,bw) e softmax para (c1,c2,c3), mas square error para todos também funciona
+
+[Landmark Detection]
+Definir pontos de interesse (landmarks) na imagem é uma forma de possibilitar algumas aplicações de classificação.
+Exemplos:
+    - Pontos que definem as linhas do rosto (delimitando olhos, boca, nariz e maxilar para capturar o formato do rosto)
+        -> y = [pc, l1x, l1y, ..., l64x, l64y]
+            pc = existe ou não um rosto na imagem?
+            Onde (l1x, l1y) define o primeiro landmark (exemplo: o canto esquerdo do olho mais a esquerda da imagem)
+            OBS: Os pontos devem ser consistentes entre todo o dataset (nesse caso l1 não poderia ser o canto direito do olho mais a esquerda, por exemplo)
+        -> Esse mapeamento de landmarks permite a criação de aplicações de realidade aumentada, como filtros do snapchat
+    - Pontos que definem a pose de uma pessoa (um ponto para cada ombro, joelho, pé, mão, ...)
+        -> y = [pc, l1x, l1y, ..., l32x, l32y]
+
+[Object Detection]
+Detecção de objetos com "sliding windows"
+Exemplo:
+    - Treinar um classificador de carros (é um carro ou não?)
+    - Definir um tamanho de janela para avaliarmos cada pedaço da imagem de entrada (com algum valor de stride definido)
+    - Detectaremos um carro em cada janela onde a saída do classificador for 1
+    -> Problemas:
+        - Para um valor de stride muito pequeno podemos ter alto custo computacional (especialmente se o classificador for uma rede neural)
+        - Um valor grande de stride diminui o custo computacional mas pode ser muito impreciso
+
+OBS: Ao calcularmos o classificador em cada janela acabamos fazendo muitos cálculos repetidos
+
+Existe uma solução para o custo computacional: O detector "sliding windows" pode ser implementado de forma mais eficiente com convolução
+
+[Convolutional Implementation of Sliding Windows]
+Podemos transformar camadas FC em camadas convolucionais:
+    -> Com FC: 
+        Entrada (14x14x3) -> [16 filtros 5x5] CONV (10x10x16) -> [16 filtros 2x2] MAXPOOL (5x5x16) -> FC (400) -> FC (400) -> Softmax (4)
+    -> Transformando FC para CONV:
+        Entrada (14x14x3) -> [16 filtros 5x5] CONV (10x10x16) -> [16 filtros 2x2] MAXPOOL (5x5x16) -> [400 filtros 5x5] CONV (1x1x400) -> [400 filtros 1x1] CONV (1x1x400) -> [4 filtros 1x1] CONV (1x1x4)
+    OBS: Quando substituímos nossas camadas FC por camadas convolucionais ganhamos flexibilidade no tamanho da saída de todas as camadas
+
+Implementação convolucional do "sliding windows":   [Sermanet et al., 2014, OverFeat: Integrated recognition, localization and detection using convolutional networks]
+    -> Quando substituímos nossas camadas FC por camadas convolucionais podemos simplesmente usar a imagem completa como entrada (no lugar de uma janela)
+    Exemplo: ("janela" de 14x14x3)
+        - Entrada (14x14x3) -> CONV (10x10x16) -> MAXPOOL (5x5x16) -> "FC" (1x1x400) -> "FC" (1x1x400) -> "FC" (1x1x4)
+        - Entrada (16x16x3) -> CONV (12x12x16) -> MAXPOOL (6x6x16) -> "FC" (2x2x400) -> "FC" (2x2x400) -> "FC" (2x2x4) 
+                -> aqui temos as 2x2 saídas do classificador para cada janela 14x14 na imagem (stride = 2 por conta do MAXPOOL 2x2)
+        - Entrada (28x28x3) -> CONV (24x24x16) -> MAXPOOL (12x12x16) -> "FC" (8x8x400) -> "FC" (8x8x400) -> "FC" (8x8x4)
+                -> aqui temos as 8x8 saídas do classificador para cada janela 14x14 na imagem (stride = 2 por conta do MAXPOOL 2x2)
+    OBS: A posição da bounding box ainda não é tão precisa
+
+[Bounding Box Predictions]
+Algoritmo YOLO (You Only Look Once):    [Redmon et al., 2015, You Only Look Once: Unified real-time object detection]
+    -> Identifica de forma mais precisa a posição da bounding box
+    -> Intuição: 
+        - Podemos pensar na imagem dividida em várias regiões (um grid 3x3 por exemplo)
+        - E em cada região avaliamos o classificador definido na primeira aula dessa semana (saída y = [pc, bx, by, bh, bw, c1, c2, c3])
+    -> Implementação é feita de forma convolucional (ou seja, não avaliamos o mesmo classificador uma vez em cada célula):
+        - Exemplo: (grid 3x3)
+            -> A saída que queremos tem formato 3x3x8 (isso é, 8 parâmetros [pc, bx, by, bh, bw, c1, c2, c3] para cada célula do grid)
+            -> Entrada (100x100x3) -> CONV -> MAXPOOL -> ... -> Saída (3x3x8)
+        - O objeto detectado deve ser atribuído à célula do grid onde se encontra seu ponto central (bx,by)
+        - A convenção é que em cada célula temos pontos cujas coordenadas estão no intervalo (0, 1)
+        OBS: bh e bw podem ser maiores que 1, mas bx e by não
+
+[Intersection Over Union]
+Uma forma de medir o desempenho do algoritmo de detecção é calcular o IoU:
+    IoU = (Interseção entre a bounding box prevista e a classificada) / (União entre a bounding box prevista e a classificada)
+    Threshold padrão: Previsão correta se IoU >= 0.5
+
+[Non-max Suppression]
+Quando definimos um grid de alta granularidade para o algoritmo YOLO podemos ter diversas células vizinhas com pc > 0.6 (threshold escolhido)
+Uma forma de descartar as células que se referem ao mesmo objeto é calcular IoU entre a bounding box que possui o pc máximo (escolhida como a delimitadora da posição do objeto) e as bounding boxes restantes e descartá-las quando IoU >= 0.5
+
+[Anchor Boxes]
+O problema do algoritmo que estamos especificando até agora é que ele é capaz de detectar apenas uma classe de objeto por célula
+Podemos escolher mais de um formato de bounding box para considerarmos no aprendizado e identificarmos mais de um objeto por célula
+Exemplo com dois formatos:
+    Saída: y = [pc1, bx1, by1, bh1, bw1, c11, c21, c31, pc2, bx2, by2, bh2, bw2, c12, c22, c32]    (3x3x16 ou 3x3x2x8  [2 é o número de anchors])
+        (Onde pc1, bx1, ..., c31 se refere ao primeiro bounding box (um retângulo deitado, por exemplo) e pc2, bx2, ..., c32 se refere ao segundo bounding box (um retângulo em pé))
+    Atribuímos cada objeto à célula onde seu ponto central se encontra e o número da bounding box com maior IoU com o objeto
+        Ou seja, agora temos um par (célula, boundingBox) e podemos identificar até dois objetos em cada célula, desde que seus formatos sejam consideravelmente distintos (neste caso, um objeto deve ser mais alto do que largo e o outro mais largo do que alto)
+
+[YOLO Algorithm]
+Exemplo: (grid de 3x3 e 2 bounding boxes [retângulo vertical (1) e horizontal (2)])
+    -> Classes:
+        - Pedestre (c1)
+        - Carro (c2)
+        - Moto (c3)
+    -> y é 3x3x16 ([pc1, bx1, by1, bh1, bw1, c11, c21, c31, pc2, bx2, by2, bh2, bw2, c12, c22, c32])
+    -> Treinamento
+        - Célula sem objetos terá y = [0, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?]  (? é "don't care")
+        - Célula contendo a traseira de um carro (bounding box horizontal se encaixa melhor) terá y = [0, ?, ?, ?, ?, ?, ?, ?, 1, bx, by, bh, bw, 0, 1, 0]
+    -> Esquema simplificado da rede: Entrada (100x100x3) -> ConvNet -> Saída (3x3x16)
+    -> Saída "non-max suppressed":
+        - Para cada célula do grid obter os 2 bounding boxes previstos
+        - Descartar as probabilidades baixas (pc <= 0.6 por exemplo)
+        - Para cada classe use "non-max suppression" (de forma independente) para gerar as predições finais
+            -> Isso é, descartar as bounding boxes onde o IoU entre a bounding box de pc máximo e as outras bounding boxes é maior que 0.5
+
+[Region Proposals]
+Region Proposal (R-CNN):    [Girshik et al., 2013, Rich feature hirarchies for accurate object detection and semantic segmentation]
+    Tenta pegar apenas algumas janelas de interesse (regiões propostas) para executar o "sliding windows"
+    As regiões (blobs) são dadas após a execução de um algoritmo de segmentação
+
+OBS: Esse algoritmo é consideravelmente lento
+
+Algoritmos mais rápidos:
+    Fast R-CNN:     [Girshik, 2015. Fast R-CNN]
+        - Basicamente o R-CNN utilizando a implementação convolucional de "sliding windows"
+        - Continua lento por depender da execução prévia do algoritmo de segmentação
+    Faster R-CNN:   [Ren et al., 2016, Faster R-CNN: Towards real-time object detection with region proposal networks]
+        - Usa redes convolucionais para propor as regiões
+        OBS: As implementações ainda são mais lentas que as do algoritmo YOLO
