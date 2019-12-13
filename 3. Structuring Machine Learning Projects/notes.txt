@@ -167,7 +167,7 @@ Amostras classificadas de forma incorreta nos conjuntos dev/teste:
 	Corrigindo exemplos:
 		-> Aplicar o mesmo processo nos conjuntos dev e teste e garantir que eles continuam tendo a mesma distribuição
 		-> Considere examinar exemplos em que o algoritmo acertou, além dos exemplos em que ele errou
-		-> Os conjuntos de dados de treinamento e dev/teste agora possuem distribuição um pouco diferentes
+		-> Os conjuntos de dados de treinamento e dev/teste agora possuem distribuições um pouco diferentes
 
 [Build Your First System Quickly, Then Iterate]
 Exemplo: Speech Recognition

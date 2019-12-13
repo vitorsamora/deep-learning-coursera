@@ -88,7 +88,7 @@ Bias correction: v_t / (1 - beta^t)  [corrige a estimativa dos primeiros dias/ob
 Quase sempre funciona melhor que o gradiente decrescente tradicional
 A ideia básica é calcular as médias exponencialmente ponderadas dos gradientes e usá-los na atualização dos pesos (isso faz com que a direção não varie tanto de uma iteração para outra)
 Momentum algorithm: (hiperparâmetros: alpha, beta = 0.9)
-	On iterarion t:
+	On iteration t:
 		Compute dW, db on current mini-batch
 		Vdw = beta * Vdw + (1 - beta) * dW
 		Vdb = beta * Vdb + (1 - beta) * db
@@ -99,7 +99,7 @@ Momentum algorithm: (hiperparâmetros: alpha, beta = 0.9)
 [RMSprop]
 "Propagação de raíz quadrada média" (Root Mean Square Prop) também pode acelerar o gradiente decrescente
 RMSprop:
-	On iterarion t:
+	On iteration t:
 		Compute dW, db on current mini-batch
 		Sdw = beta2 * Sdw + (1 - beta2) * dw^2 [^2 é element-wise]
 		Sdb = beta2 * Sdb + (1 - beta2) * db^2 [^2 é element-wise]
@@ -111,7 +111,7 @@ RMSprop:
 Adam: Adaptive Moment Estimation
 É basicamente a união entre Momentum e RMSprop: (hiperparâmetros: beta1 = 0.9, beta2 = 0.999, epsilon = 10^(-8), alpha)
 	Vdw = 0, Sdw = 0, Vdb = 0, Vdw = 0
-	On iterarion t:
+	On iteration t:
 		Compute dW, db on current mini-batch
 		Vdw = beta1 * Vdw + (1-beta1) * dW, Vdb = beta1 * Vdb + (1-beta1) * db 		[Momentum]
 		Sdw = beta2 * Sdw + (1-beta2) * dw^2, Sdb = beta2 * Sdb + (1-beta2) * db^2	[RMSprop]

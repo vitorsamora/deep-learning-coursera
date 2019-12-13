@@ -26,7 +26,7 @@ Neural Networks Basics
 
 [Binary Classification]
 Classificação para 2 classes
-Conveções: 
+Convenções: 
 	para NN teremos a convenção de usar a matriz X com os x_i colocados em colunas (isso é, matriz de dimensão n x m) 
 	da mesma forma, teremos y de dimensão 1 x m
 
