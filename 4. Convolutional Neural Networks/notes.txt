@@ -493,3 +493,105 @@ Algoritmos mais rápidos:
     Faster R-CNN:   [Ren et al., 2016, Faster R-CNN: Towards real-time object detection with region proposal networks]
         - Usa redes convolucionais para propor as regiões
         OBS: As implementações ainda são mais lentas que as do algoritmo YOLO
+
+
+
+Special Applications: Face Recognition & Neural Style Transfer
+
+
+-> Face Recognition
+
+[What is Face Recognition?]
+Face verification:
+    - Entrada: Imagem e nome (ou ID)
+    - Saída: Informa se a imagem é da pessoa cujo nome foi dado
+
+Face Recognition:
+    - Tem uma base de K pessoas
+    - Entrada: Imagem
+    - Saída: ID da pessoa se ela é uma das K pessoas e "Não reconhecido" caso contrário
+
+[One Shot Learning]
+É necessário que a aplicação seja capaz de reconhecer a pessoa tendo aprendido apenas com uma imagem de cada pessoa
+Não é uma boa ideia treinarmos uma rede convolucional tendo como entrada a imagem da pessoa e na saída uma camada softmax com a quantidade de classes igual a quantidade de pessoas na base pois o dataset é extremamente pequeno
+É melhor treinarmos uma rede para aprender uma função de "similaridade": d(img1, img2) = grau de similaridade entre as imagens
+Definimos um threshold t para o qual: (face verification)
+    - Se d(img1, img2) <= t então consideramos que as duas pessoas são iguais 
+    - Se d(img1, img2) > t então consideramos que as duas pessoas são diferentes
+
+[Siamese Network]
+É uma arquitetura de rede onde calculamos as saídas para duas imagens (x1 e x2) e depois comparamos suas saídas (ou encodings) f(x) 
+Os parâmetros da NN definem um encoding f(x) de tamanho 128: [Taigman et al., 2014. DeepFace closing the gap to human level performance]
+    d(x1, x2) = ||f(x1) - f(x2)||^2
+Queremos que:
+    - Se xi e xj são a mesma pessoa, então ||f(xi) - f(xj)||^2 é pequeno
+    - Se xi e xj são pessoas diferentes, então ||f(xi) - f(xj)||^2 é grande
+
+[Triplet Loss]          [Schroff et al., 2015, FaceNet: A unified embedding for face recognition and clustering]
+A ideia básica é que sempre olharemos para três imagens por vez:
+    - Uma fixa [A], que será comparada com as outras duas
+    - Um exemplo positivo [P] (mesma pessoa que da imagem fixa)
+    - Um exemplo negativo [N] (uma pessoa diferente da imagem fixa)
+
+Objetivo: ||f(A) - f(P)||^2 - ||f(A) - f(N)||^2 + alpha <= 0       (alpha é chamado de margem, um hiperparâmetro)
+Loss: L(A, P, N) = max(||f(A) - f(P)||^2 - ||f(A) - f(N)||^2 + alpha, 0)
+    J = sum(L(Ai, Pi, Ni))
+
+É necessário garantir que as tríades de imagens escolhidas sejam "dificeis" para que a rede seja bem treinada
+Isso é, d(A, P) ~ d(A, N)
+
+[Face Verification and Binary Classification]       [Taigman et al., 2014. DeepFace closing the gap to human level performance]
+Existe outra forma de treinar os parâmetros que consiste na conexão das últimas camadas das duas redes (uma para cada imagem) através de uma unidade logística:
+    yhat = sigmoid(sum(w_k * |f(xi)_k - f(xj)_k| + b))
+    (também podemos substituir |f(xi)_k - f(xj)_k| por (f(xi)_k - f(xj)_k)^2 / (f(xi)_k + f(xj)_k)   [similaridade qui-quadrado])
+    OBS: Aqui a entrada é composta por duas imagens
+    OBS2: Para predição podemos pré-computar as saídas f(xj) dos funcionários presentes na base para melhorar o desempenho 
+            (não existe necessidade de armazenar as imagens nessa abordagem [pode ser usada com triplet loss também])
+
+
+-> Neural Style Transfer
+
+[What is Neural Style Transfer]
+Na transferência de estilo de uma imagem para outra temos 3 imagens:
+    -> C: Imagem para a qual queremos transferir o estilo
+    -> S: Imagem com o estilo a ser transferido
+    -> G: Imagem gerada (C com o estilo de S)
+
+[What Are Deep ConvNets Learning?]
+Para visualizar o que uma ConvNet está aprendendo realizamos o procedimento:
+    - Escolher uma unidade na primeira camada 
+    - Encontrar os 9 fragmentos de imagem que maximizam a unidade escolhida
+    -> Repetir para outras unidades
+
+(A cada camada as detecções ficam mais complexas)
+
+[Cost Function]     [Gatys et al., 2015, A neural algorithm of artistic style]
+Mede quão boa é a imagem G gerada: 
+    J(G) = alpha * Jcontent(C,G) + beta * Jstyle(S,G)
+
+Algoritmo simplificado:
+    - Inicializar aleatoriamente a matriz G (100x100x3)
+    - Usar gradiente decrescente para minimizar J(G)
+
+[Content Cost Function]
+Queremos usar a camada l de uma rede convolucional pretreinada (VGG, por exemplo) para computar o custo do conteúdo
+Definimos al_c e al_g como a ativação da camada l nas imagens C e G  (al_g and al_c UNROLLED INTO VECTORS)
+Se al_c e al_g são similares então as duas imagens possuem conteúdo similar:
+    JContent(C,G) = ||al_c - al_g||^2 / 2
+
+[Style Cost Function]
+Estilo é definido como a correlação entre as ativações através dos canais
+
+Style Matrix (Gram Matrix):
+    Gl(k,k') = sum(sum(al_g(i,j,k) * al_g(i,j,k')))     [Gl é nl_c x nl_c]
+
+JStyle(S,G) = ||Gl_S - Gl-G||^2 / (2 * nl_h * nl_w * nl_c) = sum(sum((Gl_S(k,k') - Gl_G(k,k'))^2)) / (2 * nl_h * nl_w * nl_c)
+(||Gl_S - Gl-G||^2 é a norma frobenius)
+
+Uma média entre as camadas dá resultados melhores:
+    JStyleTotal(S,G) = sum(lambda_l * JStyle(S,G)  para l)
+
+[1D and 3D Generalizations]
+Convolução também pode ser aplicada em dados de outras dimensões
+Exemplo: Áudio (1D)     [para a maioria das aplicações com dados 1D são usadas redes neurais recorrentes, mas ConvNets também podem ser usadas]
+Exemplo: Vídeo (3D) [altura, largura e tempo]
