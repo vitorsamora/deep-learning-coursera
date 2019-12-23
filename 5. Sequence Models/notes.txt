@@ -1,0 +1,24 @@
+~c<t> = tanh(Wc[a<t-1>, x<t>] + bc)
+ru = sigmoid(Wu[a<t-1>, x<t>] + bu)     [update]
+rf = sigmoid(Wf[a<t-1>, x<t>] + bf)     [forget]
+ro = sigmoid(Wo[a<t-1>, x<t>] + bo)     [output]
+c<t> = ru * ~c<t> + rf * c<t-1>
+a<t> = ro * tanh(c<t>)
+
+[Bidirectional RNNs (BRNNs)]
+A inspiração é "obter informação do futuro"
+Basicamente temos 2 redes:
+    - forward: equivalente ao que temos construído nas últimas aulas
+    - backward: avaliada no sentido contrário
+
+Calculamos yhat compondo as duas ativações:
+    yhat<t> = g(Wy[a_f<t>, a_b<t>] + by)        
+        -> a_f: ativação forward
+        -> a_b: ativação backward
+
+-> Desvantagem: Precisa da sequência inteira para fazer predições
+
+[Deep RNNs]
+A ideia é empilhar diversas camadas (linhas) de RNNs e conectar a saída da camada anterior na entrada da camada atual
+Ex:
+    a2<3> = g(Wa2[a2<2>, a1<3>] + ba2)
