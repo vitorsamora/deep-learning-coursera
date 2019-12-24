@@ -1,9 +1,157 @@
-~c<t> = tanh(Wc[a<t-1>, x<t>] + bc)
-ru = sigmoid(Wu[a<t-1>, x<t>] + bu)     [update]
-rf = sigmoid(Wf[a<t-1>, x<t>] + bf)     [forget]
-ro = sigmoid(Wo[a<t-1>, x<t>] + bo)     [output]
-c<t> = ru * ~c<t> + rf * c<t-1>
-a<t> = ro * tanh(c<t>)
+SEQUENCE MODELS
+
+
+
+Recurrent Neural Networks
+
+[Why Sequence Models?]
+Exemplos:
+	- Speech Recognition: Transcrição de áudio
+	- Music Generation: Geração de música dadas algumas notas iniciais
+	- Sentiment Classification: Dada uma resenha, estimar a quantidade de estrelas
+	- DNA Sequence Analysis: Identificar proteínas
+	- Machine Translation: Tradução de texto de um idioma para outro
+	- Video Activity Recognition: Identificar que tipo de atividade um humano está realizando num vídeo (ex: correndo)
+	- Name Entity Recognition: Dado um texto, reconhece as entidades envolvidas (ex: pessoas, empresas, ...)
+
+[Notation]
+Exemplo com Name Entity Recognition:
+	- x: Harry Potter and Hermione Granger invented a new spell.
+		-> x = [x<1>, x<2>, ..., x<t>, ..., x<9>]
+			- t de temporal
+			- Tx é o tamanho da sequência (Tx = 9)
+	- y: [1, 1, 0, 1, 1, 0, 0, 0, 0]
+		-> Ty = 9
+Palavras são representadas com um vocabulário:
+	[a, aaron, ..., and, ..., harry, ..., potter, ..., zulu]
+	(1    2         367       4075        6830         10000) <- índices
+
+	Então as entradas de x são da forma (one-hot vectors):
+	x<1> = [0, 0, ..., 0, 1, 0, ..., 0]    (Harry)
+		   (1  2          4075       10000) <- índices
+
+[Recurrent Neural Network Model]
+Não usamos uma NN comum pois: 
+	- as entradas e saídas podem ter diferentes tamanhos de acordo com cada amostra
+	- as features aprendidas precisam ser compartilhadas através de diferentes posições no texto
+
+Redes neurais recorrentes (Tx = Ty  [arquitetura many-to-many]):
+		yhat<1>		yhat<2>					yhat<Ty>
+		  | Wya		  | Wya					  | Wya
+		| . |		| . |					| . |
+  a<0>	| . | a<1>	| . | a<2>		a<Tx-1>	| . |
+------->| . |------>| . |------> ... ------>| . |
+		| . |  Waa	| . |  Waa		 Waa	| . |
+		| . |		| . |					| . |
+		  | Wax		  | Wax					  | Wax
+		 x<1>		 x<2>					x<Tx>
+
+	OBS: a<0> normalmente é um vetor de zeros
+	OBS2: W's são parâmetros
+
+	-> Desvantagem: Utiliza apenas as palavras anteriores para classificar
+
+Forward Prop:
+	a<0> = vetor de zeros
+	a<1> = g1(Waa * a<0> + Wax * x<1> + ba)		<- tanh/ReLU
+	yhat<1> = g2(Wya * a<1> + by)				<- sigmoid/softmax
+	...
+	a<t> = g1(Waa * a<t-1> + Wax * x<t> + ba) = g1(Wa[a<t-1>, x<t>] + ba)   [simplificação (Wa = [Waa | Wax])]
+	yhat<t> = g2(Wya * a<t> + by) = g2(Wy * a<y> + by)
+
+[Backpropagation Through Time]
+Loss:
+	L<t>(yhat<t>, y<t>) = - y<t> * log(yhat<t>) - (1-y<t>) * log(1-yhat<t>)
+	L(yhat, y) = sum(L<t>(yhat<t>, y<t>) para t de 1 a Ty)
+
+[Different Types of RNNs]
+-> Para classificação de sentimento temos Ty = 1 < Tx  [arquitetura many-to-one]
+	- Nesse caso temos yhat saindo apenas da última camada da rede
+
+-> Para geração de música temos Tx = 1 < Ty  [arquitetura one-to-many]
+	- Nesse caso temos x entrando apenas na primeira camada da rede 
+	- Conectamos a saída yhat<t-1> como se fosse a entrada x<t> da camada t
+	- OBS: x pode ser vazio
+
+-> Para tradução de máquinas temos Tx != Ty  [arquitetura many-to-many]
+	- Nesse caso temos primeiro Tx camadas apenas com entradas (sem saídas yhat) [parte encoder] e Ty camadas só com saídas (sem entradas x) [parte decoder]
+
+[Language Model and Sequence Generation]
+Para speech recognition queremos uma rede que forneça boas probabilidades:
+	-> Por exemplo, "The apple and pear salad" pode ser interpretado como:
+		- The apple and pair salad: P(The apple and pair salad) = 3.2 * 10^-13
+		- The apple and pear salad: P(The apple and pear salad) = 5.7 * 10^-10  <- mais provável
+
+	-> Language modelling fornece: 
+		P(sentença) = P(y<1>, y<2>, ..., y<Ty>)
+
+Conjunto de treinamento: Um grande corpus de texto
+	- Substituímos paralavras desconhecidas pelo token <UNK>
+	- Podemos incluir pontuação:
+		- Ex: ponto final '.' pode ser substituído por <EOS>
+
+Modelo RNN:
+"Cats average 15 hours of sleep a day. <EOS>"
+
+[P(a), P(aaron), ...]   [P(_|"cats")]   [P(_|"cats average")]
+		yhat<1>       yhat<2>     	yhat<3>			<-(softmax)
+		  |     		|				|
+a<0> --> a<1> -------> a<2>	--------> a<3> ---> ...
+		  |		        |       		|
+	  x<1> = 0       x<2> = y<1>  x<3> = y<2>
+
+L<t>(yhat<t>, y<t>) = - sum(y_i<t> * log(yhat_i<t>))
+L(yhat, y) = sum(L<t>(yhat<t>, y<t>))
+
+OBS: Dadas as primeiras palavras, a rede consegue dizer qual a probabilidade de cada palavra do vocabulário ser a próxima no texto
+
+[Sampling Novel Sequences]
+Para gerar novas sequências basta, para cada camada t: 
+	- sortearmos a saída yhat<t> (dentre as palavras com alta probabilidade) 
+	- considerarmos y<t> = yhat<t> para a próxima camada (x<t+1> = yhat<t>)
+	OBS1: Paramos quando gerarmos o token <EOS>
+	OBS2: Podemos rejeitar <UNK> caso seja sorteada
+
+Modelo de liguagem a nível de caracter:
+	- Nesse caso utilizamos o vocabulário: ['a', 'b', ..., 'z', ' ', '.', ',', ';', '0', ..., '9', 'A', ..., 'Z']
+	- Vantagem: Não existem palavras desconhecidas
+	- Desvantagem: Sequências mais longas (mais computacionalmente custoso de treinar)
+
+[Vanishing Gradients with RNNs]
+O modelo que geramos até o momento não é muito bom para captar a dependência de palavras muito distantes
+Ex:
+	The CAT, which ate ..., WAS full
+	The CATS, which ate ..., WERE full
+
+Isso ocorre por causa do desaparecimento de gradientes quando a Rede Neural é muito grande
+
+Explosão de gradientes é mais fácil de identificar pois veremos diversos NaNs nos gradientes
+	-> Solução: Gradient Clippling
+		- Reescalar os grandientes quando forem maiores que algum threshold
+
+[Gated Recurrent Unit (GRU)] 	[Cho et al., 2014. On properties of neural machine translation: Encoder-decoder approaches]		[Chung et al., 2014. Empirical Evaluation of Gated Recurrent Neurak Networks on Sequence Modeling]
+Para resolver o desaparecimento de gradientes podemos utilizar uma célula de memória (c) que é atualizada a cada camada:
+	-> GRU simplificada:
+		~c<t> = tanh(Wc[c<t-1>, x<t>] + bc)		[novo candidato a c]
+		ru = sigmoid(Wu[c<t-1>, x<t>] + bu)		[taxa de atualização (gate)]
+		c<t> = ru * ~c<t> + (1-ru) * c<t-1>		[aqui * é element-wise]
+		a<t> = c<t>
+
+	-> GRU completa:
+		~c<t> = tanh(Wc[rr * c<t-1>, x<t>] + bc)		[novo candidato a c]
+		ru = sigmoid(Wu[c<t-1>, x<t>] + bu)				[taxa (gate) de atualização]
+		rr = sigmoid(Wr[c<t-1>, x<t>] + br)				[taxa de quanto c<t-1> influencia em ~c<t>]
+		c<t> = ru * ~c<t> + (1-ru) * c<t-1>				[aqui * é element-wise]
+		a<t> = c<t>
+
+[Long Short Term Memory (LSTM)]		[Hochreiter & Schmidhuber 1997. Long short-term memory]
+Uma versão mais genérica da GRU:
+	~c<t> = tanh(Wc[c<t-1>, x<t>] + bc)			[novo candidato a c]
+	ru = sigmoid(Wu[c<t-1>, x<t>] + bu)			[taxa de atualização (update)]
+	rf = sigmoid(Wf[c<t-1>, x<t>] + bf)			[taxa de esquecimento (forget)]
+	ro = sigmoid(Wo[c<t-1>, x<t>] + bo)			[taxa de saída (output)]
+	c<t> = ru * ~c<t> + (1-ru) * c<t-1>			[aqui * é element-wise]
+	a<t> = ro * tanh(c<t>)
 
 [Bidirectional RNNs (BRNNs)]
 A inspiração é "obter informação do futuro"
