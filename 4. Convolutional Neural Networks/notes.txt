@@ -593,5 +593,5 @@ Uma média entre as camadas dá resultados melhores:
 
 [1D and 3D Generalizations]
 Convolução também pode ser aplicada em dados de outras dimensões
-Exemplo: Áudio (1D)     [para a maioria das aplicações com dados 1D são usadas redes neurais recorrentes, mas ConvNets também podem ser usadas]
+Exemplo: Áudio (1D) [para a maioria das aplicações com dados 1D são usadas redes neurais recorrentes, mas ConvNets também podem ser usadas]
 Exemplo: Vídeo (3D) [altura, largura e tempo]

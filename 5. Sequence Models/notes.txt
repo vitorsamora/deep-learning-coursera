@@ -170,3 +170,146 @@ Calculamos yhat compondo as duas ativações:
 A ideia é empilhar diversas camadas (linhas) de RNNs e conectar a saída da camada anterior na entrada da camada atual
 Ex:
     a2<3> = g(Wa2[a2<2>, a1<3>] + ba2)
+
+
+
+Natural Language Processing & Word Embeddings
+
+-> Introduction to Word Embeddings
+
+[Word Representation]
+Até agora temos usado a representação em vetores "one-hot"
+O problema é que o modelo não aprende a associar palavras como por exemplo "laranja" e "maçã" (reconhecer que são frutas)
+Uma forma de trazer essa semântica ao modelo é criar uma representação com várias features para cada palavra (por exemplo: gênero [-1 para masculino e 1 para feminino], comida (0, 1), tamanho (0, 1), custo (0, 1), verbo (0, 1), ...)
+Após a construção dessa matriz (word embedding) podemos visualizar os dados utilizando o algoritmo t-SNE [van der Maaten and Hinton., 2008. Visualizing data using t-SNE]
+
+[Using Word Embeddings]
+É possível utilizarmos transferência de aprendizado com base em um grande dataset não classificado para treinarmos nossa rede:
+	- Aprender "word embeddings" de um grande corpus textual (1 - 100 bilhões de palavras) [ou baixar "word embeddings" pré-treinados da internet]
+	- Transferir o "embedding" para uma nova tarefa, com um conjunto de treinamento menor (100K palavras)
+	- Continuar ajustando os "embeddings" com dados novos (opcional)
+
+"Word embeddings" se relacionam com "encoding" (citado nas aulas de reconhecimento facial)
+
+[Properties of Word Embeddings]
+Utilizando word embeddings podemos identificar analogias, como por exemplo:		[Mikolov et. al., 2013, Linguistic regularities in continuos space word representations]
+"Homem" está para "Mulher" assim como "Rei" está para _____ (Man->Woman as King->?):
+	e_5391 = e_man = [-1, 0.01, 0.03, 0.09]   (vetor do embedding da palavra "man", que está no índice 5391)
+	e_woman = [1, 0.02, 0.02, 0.01]
+	e_king = [-0.95, 0.93, 0.70, 0.02]
+	Queremos que: e_man - e_woman ~ e_king - e_?
+	Isso é, queremos encontrar a palavra w que satisfaz: argmax_w(sim(e_w, e_king - e_man + e_woman))  
+		e_man - e_woman ~ [-2, 0, 0, 0]
+		e_king - e_queen ~ [-2, 0, 0, 0]
+	(acurácia de 30% - 75% utilizando esse método)
+
+A similaridade (sim) normalmente usada é a similaridade de cossenos:
+	sim(u, v) = u.T * v / (||u|| * ||v||)
+
+[Embedding Matrix]
+Exemplo: Matriz E de embeddings de 300 x 10000	[300 features de 10000 palavras]
+	Suponhamos que a palavra "orange" esteja na coluna 6257, então:
+		E * o_6257 = e_6257		[dimensão 300 x 1]			(o_6257 é o vetor one-hot com 1 na posição 6257 e dimensão 10000 x 1)
+		(na prática é melhor usar uma função especializada para buscar pela coluna contendo o embedding, pois a matriz e o vetor one-hot normalmente possuem dimensões grandes)
+
+-> Learning Word Embeddings: Word2Vec & GloVe
+
+[Learning Word Embeddings]
+Historicamente os primeiros algoritmos usados para o aprendizado de word embeddings eram mais complexos e, com o tempo, descobriu-se que algoritmos mais simples também poderiam funcionar muito bem
+Rede neural comum:		[Bengio et. al., 2003, A neural probabilistic language model]
+	- Usa as primeiras k palavras para prever a próxima (k é hiperparâmetro)
+	Exemplo: "I want a glass of orange _____"
+		(Índices das palavras no vocabulário: 4343, 9665, 1, 3852, 6163, 6257)
+		-> Pegamos os k=6 embeddings das palavras (e_4343, ..., e_6257) 
+		-> Juntamos os embeddings em um vetor de 1800 x 1 (cada palavra tem 300 features)
+		-> Usamos esse vetor como entrada de uma rede neural com uma hidden layer com parâmetros W1 e b1
+		-> A rede tem como saída uma camada softmax de tamanho 10000 (tamanho do nosso vocabulário)
+
+[Word2Vec]
+Skip-grams:		[Mikolov et. al., 2013, Linguistic regularities in continuos space word representations]
+	Exemplo: "I want a glass of orange juice to go along with my cereal"
+	- Ideia: sortear uma palavra (c) da frase para usar como contexto e algumas palavras alvo (t) antes ou depois dela (dentro de uma janela determinada)
+		Context 	Target
+		orange		juice
+		orange		glass
+		orange		my
+	- A partir da palavra c obtemos e_c e utilizamos e_c como entrada de uma camada softmax
+	- Softmax: p(t | c) = e^(theta_t.T * e_c) / sum(e^(theta_j.T * e_c) para j de 1 até 10000)		[theta_t é o parâmetro associado com a saída t]
+	- Loss: L(y, yhat) = - sum(y_i * log(yhat_i) para i de 1 até 10000)
+	- Problema: Podemos ter problemas de desempenho computacional por conta de a camada softmax ser muito grande
+		-> Usar hierarchical softmax (uma árvore contendo as palavras mais frequentes nos nós mais rasos) [mais detalhes no artigo referenciado]
+	- Importante: A palavra c deve ser sorteada evitando palavras muito frequentes (tais como the, of, a, and, to, ...)
+		-> Ou seja, não sorteamos da distribuição uniforme pois analisaríamos as mesmas palavras (as mais frequentes) muitas vezes
+
+OBS: a definição usada para "estar no contexto" é +-k palavras (isso é, k palavras anteriores ou posteriores à palavra context)
+
+[Negative Sampling]		[Mikolov et. al., 2013, Linguistic regularities in continuos space word representations]
+Definimos um novo problema de aprendizado, obtendo um exemplo onde uma palavra é target de outra e sorteando do vocabulário k exemplos "não-target"
+Exemplo: "I want a glass of orange juice to go along with my cereal" (k = 4)
+	Context 	Word 	Target?
+	orange		juice	1
+	orange		king 	0
+	orange		book 	0
+	orange		the 	0
+	orange		of	 	0
+
+	------- x -------	y 		(Context (c) e Word (t) compõem a entrada x do aprendizado e y a saída)
+	c 			t 		y
+
+Escolhendo k:
+	- Datasets pequenos/médios: 5-20
+	- Datasets grandes: 2-5
+
+Para não usarmos softmax (resultando no mesmo problema acima), treinaremos 10000 regressões logísticas: P(y=1|c,t) = sigmoid(theta_t.T * e_c)
+	- A cada iteração k + 1 unidades (palavras) são treinadas
+
+OBS: No sorteio das palavras do vocabulário para as quais "Target?" é zero usamos a heurística:
+	P(wi) = f(wi)^(3/4) / sum(f(wj)^(3/4) para j de 1 até 10000)
+
+[GloVe Word]		[Pennington et. al., 2014. Glove: Global vectors for word representation]
+X_i_j = número de vezes que a palavra j aparece no contexto da palavra i 	(i e j são equivalentes a c e t da outra formulação)
+Custo: sum(sum(f(X_i_j) * (theta_i.T * e_j + bi + bj' - log(X_i_j))^2))
+	f(X_i_j) = 0 se X_i_j = 0
+	caso contrário, dá mais peso a palavras mais frequentes
+e_w final = (e_w + theta_w) / 2
+
+OBS: Na matriz gerada por esse algoritmo pode ser difícil visualizar o papel de cada feature pois os vetores gerados podem estar em outra base
+
+-> Applications Using Word Embeddings
+
+[Sentiment Classification]
+Dado um texto (x) determinar se o autor gostou ou não (y) daquilo sobre o que ele está falando
+
+Classificação de sentimento simples:
+	- Mesmo com um dataset pequeno (10000-100000 palavras), podemos usar um word embedding de 100B de palavras para realizar a tarefa
+	Exemplo: resenhas de restaurantes
+	"The dessert is excellent" (8928, 2468, 4694, 3180)
+	- Obtemos os embeddings (e_8928, ..., e_3180) de dimensão 300 x 1
+	- Calculamos a média (ou soma) dos componentes entre todos os embeddings (dimensão do resultado também é 300 x 1)
+	- Passamos o resultado para uma camada softmax para 5 classes (de 1 a 5 estrelas) para determinar yhat
+	- Desvantagem: esse algoritmo ignora a ordem das palavras
+		-> Exemplo problemático: "Completely lacking in good taste, good service and good ambience" 
+			- Será classificado com muitas estrelas por conta da quantidade de vezes que "good" foi usada
+			- Normalmente "good" é associada a um sentimento positivo
+
+RNN para classificação de sentimento:
+	- Os e_j são usados como entrada no lugar dos vetores "one-hot" o_j
+	- Na última "camada" temos a saída sendo passada para uma camada softmax [arquitetura many-to-one]
+
+[Debiasing Word Embeddings]		[Bolukbasi et. al., 2016. Man is to computer as woman is to homemaker? Debiasing word embeddings]
+Aqui "bias" não é o viés do qual normalmente falamos para discutir técnicas de ML (bias/variance), mas sim de um bias dados por gênero, etnia, idade, orientação sexual, ...
+Exemplo:
+	Man:Woman as King:Queen 					(correto)
+	Man:Computer_Programmer as Woman:Homemaker 	(incorreto)
+		- Estereótipo que pode ter sido dado pelos textos presentes no conjunto de treinamento usado no treino do word embedding
+		- Queremos: Man:Computer_Programmer as Woman:Computer_Programmer
+
+Para reduzirmos ou eliminarmos um determinado bias identificado:
+	- Identificamos a direção (vetorial) do bias
+		-> Tirar uma média de: e_he - e_she, e_male - e_female, ...
+	- Neutralizar: Para cada palavra que não possui intrinsicamente um gênero (doctor, babysitter, ...) obtemos sua projeção de forma a nos livrarmos do bias 
+	- Equalizar pares: 
+		-> Obter pares de palavras como (mother, father), (girl, boy), ...
+		-> Equalizar para que cada um desses pares só difiram entre si na direção do bias e sejam iguais nas outras
+
+	OBS: Um classificador linear pode nos dizer quais palavras passar pela etapa de neutralização
