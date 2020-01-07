@@ -313,3 +313,167 @@ Para reduzirmos ou eliminarmos um determinado bias identificado:
 		-> Equalizar para que cada um desses pares só difiram entre si na direção do bias e sejam iguais nas outras
 
 	OBS: Um classificador linear pode nos dizer quais palavras passar pela etapa de neutralização
+
+
+
+Sequence Models & Attention Mechanism
+
+-> Various Sequence to Sequence Architectures
+
+[Basic Models]
+Modelo de sequência para sequência (traduções):
+	- Artigos: 
+		-> Sutskever et al., 2014. Sequence to sequence learning with neural networks
+		-> Cho et al., 2014, Learning phrase representations using RNN encoder-decoder for statistical machine translation
+	- Objetivo:
+		-> x = "Jane visite l'Afrique en septembre" => y = "Jane is visiting Africa in September"
+	- Arquitetura:
+		-> Rede encoder (uma unidade por entrada em x) -> Rede decoder (uma unidade por saída em y)
+
+Geração automática de descrições de imagens:
+	- Artigos:
+		-> Mao et. al., 2014. Deep captioning with multimodal recurrent neural networks
+		-> Vinyals et. al., 2014. Show and tell: Neural image caption generator
+		-> Karpathy and Li, 2015. Deep visual-semantic alignments for generating image descriptions
+	- Objetivo:
+		-> x = imagem de um gato sentado em uma cadeira => y = "A car sitting on a chair"
+	- Arquitetura:
+		-> Rede encoder -> Rede decoder
+			- Encoding da imagem pode ser obtido passando-a por uma rede convolucional treinada (tal como AlexNet) e removendo a camada softmax [geração de feature de tamanho 4096]
+			- Parte decoder é uma RNN que tem como entrada o encoding gerado (uma unidade por saída de y)
+
+[Picking the Most Likely Sentence]
+A tradução de máquina pode ser enxergada como um language model (como os que construímos na primeira semana) condicionado a entrada x (data pela parte encoder da frase em francês)
+
+Encontrar a tradução mais provável:
+	- Exemplo:
+		-> x = "Jane visite l'Afrique en septembre"
+		-> y pode ser: 
+			- "Jane is visiting Africa in September" [1]
+			- "Jane is going to be visiting Africa in September" [2]
+			- "In September, Jane will visit Africa" [3]
+			- "Her African friend welcomed Jane in September" [4]
+
+	- Queremos argmax [y<1>, ..., y<Ty>] P(y<1>,...,y<Ty> | x)	[beam search é usado]
+		-> Não usamos greedy search pois ela não funciona tão bem (poderia gerar a saída [2], por exemplo)
+			- P(Jane is visiting | x) < P(Jane is going | x) pois going é uma palavra mais comum que visiting
+
+[Beam Search]
+Parâmetro B = 3 (beam width)
+	- Isso significa que a cada passo instanciamos 3 cópias da rede para avaliarmos as senteças parciais referentes à busca
+Primeiro passo: O algoritmo pega as B palavras com melhores probabilidades como possíveis primeiras palavras da saída (y<1>)
+	- Exemplo: Selecionamos as palavras [in, Jane, September]
+Segundo passo: 
+	- Para cada um dos B y<1> possíveis, setar yhat<1> para essa palavra 
+	- Calcular os B melhores yhat<2> usando: P(y<1>, y<2> | x) = P(y<1> | x) * P(y<2> | x, y<1>)
+		OBS: Podemos acabar descartando algum y<1> anteriormente possível (isso é, pegamos as B melhores sentenças que maximizam P(y<1>, y<2> | x))
+	- Exemplo: Selecionamos as sentenças ["in september", "Jane is", "Jane visits"]		(September foi descartado)
+Terceiro passo: ...
+(B = 1 => Greedy search)
+
+[Refinements to Beam Search]
+Melhores resultados pode ser obtidos com algumas alterações no algoritmo básico descrito na aula anterior
+Normalização de tamanho:
+	- O cálculo de probabilidades é dado por: argmax(y) Prod(P(y<t> | x, y<1>,...,y<t-1>) para t de 1 até Ty)
+	- Esse valor pode ser muito pequeno conforme Ty aumenta por conta da multiplicação de diversos valores menores que 1 (pode resultar em underflow)
+	- Para evitar esse problema podemos somar os logs (equivalente para selecionar o máximo):  argmax(y) sum(log(P(y<t> | x, y<1>,...,y<t-1>)) para t de 1 até Ty)
+		-> Tende a escolher frases pequenas, para melhorar normalizamos multiplicando por 1/(Ty^alpha)  [alpha entre 0 e 1 (hiperparâmetro), normalmente 0.7]
+
+Escolhendo B:
+	- B grande => Melhores resultados, mas mais lento
+	- B pequeno => Resultados piores, mas mais rápido
+	- Em produção normalmente é usado B entre 10 e 100, dependendo da aplicação
+	- Para pesquisa normalmente se usa B entre 1000 e 3000 para se ter uma boa performance
+
+OBS: Diferentemente de outros algoritmos de busca como BFS e DFS, não é garantido que o máximo será encontrado com o uso de Beam Search (mas executa muito mais rápido)
+
+[Error Analysis in Beam Search]
+Exemplo:
+	- x = "Jane visite l'Afrique en septembre"
+	- Tradução humana: "Jane visits Africa in September" (y*)
+	- Algoritmo: "Jane visited Africa last September" (yhat)
+	- Análise de erro: Computamos P(y*|x) e P(yhat|x) e os comparamos
+		-> Caso 1: P(y*|x) >= P(yhat|x)
+			- Conclusão: É culpa do Beam Search pois ele escolhe yhat mesmo P(y*|x) sendo maior
+		-> Caso 2: P(y*|x) < P(yhat|x)
+			- Conclusão: A culpa é do modelo RNN pois y* é uma tradução melhor e obteve probabilidade menor do que yhat
+	- Realizando a análise de erro para todos os exemplos de erro do conjunto dev podemos montar uma tabela e descobrir a proporção de erros dados pelo Beam Search vs erros dados pela RNN
+	OBS: esse método pode ser usado para qualquer tipo de busca heurística implementada
+
+[Bleu Score]		[Papineni et. al., 2002. A method for automatic evaluation of machine translation]
+Para tradução de francês para inglês podemos ter diversas respostas igualmente boas
+Para determinar qual escolher, usamos o Bleu score (Blue - Bilingual Evaluation Understudy)
+Exemplo:
+	x = "Le chat est sur le tapis"
+	Referências (qualquer uma delas é boa o suficiente):
+		- Referência 1: "The cat is on the mat"
+		- Referência 2: "There is a cat on the mat"
+	Saída: the the the the the the the
+		-> Precisão: Quantas palavras da saída aparecem nas referências
+			- Nesse caso: 7/7 = 1
+		-> Precisão modificada: Limita para o máximo de vezes (count_clip) que a palavra apareceu entre as frases das referências
+			- Nesse caso: 2/7
+
+Bleu score em bigramas:
+	- Referência 1: "The cat is on the mat"
+	- Referência 2: "There is a cat on the mat"
+	- Saída: The cat the cat on the mat
+		Bigrama 	count 	count_clip
+		the cat 	2		1
+		cat the 	1		0
+		cat on 		1		1
+		on the 		1		1
+		the mat 	1		1
+		-> Precisão: 4/6
+
+Bleu score para unigramas:
+	P1 = sum(count_clip(unigrama) para cada unigrama em yhat) / sum(count(unigrama) para cada unigrama em yhat)
+
+Bleu score para n-gramas:
+	Pn = sum(count_clip(n-grama) para cada n-grama em yhat) / sum(count(n-grama) para cada n-grama em yhat)
+
+Podemos calcular P1, P2, P3 e P4 e considerar todos para gerar o score:
+	Blue score combinado = BP * exp(sum(Pn para n de 1 até 4) / 4)
+	BP = brevity penalty
+		-> = 1 se o tamanho da saída for menor que da referência
+		-> = exp(1 - reference_output_length / MT_output_length) caso contrário
+
+[Attention Model Intuition]		[Bahdanau et. al., 2014, Neural machine translation by jointly learning to align and translate]
+É difícil memorizar toda a sentença para entradas muito grandes e isso se reflete no desempenho do modelo conforme o número de palavras aumenta
+Humanos normalmente realizam traduções de uma frase (ou um pedaço dela) por vez e Attention Model se inspira nesse comportamento
+A ideia básica é que cada palavra da saída possui um contexto (uma quantidade de palavras da entrada das quais ela pode depender)
+OBS: é usada uma rede bidirecional
+
+[Attention Model]		[Bahdanau et. al., 2014, Neural machine translation by jointly learning to align and translate]
+Usamos uma rede bidirecional (GRU ou LSTM) para extrair features do texto em francês a ser traduzido
+Para simplificar a notação, definiremos: 
+	t': usado para indexar as palavras do texto em francês
+	a<t'> = (a_f<t'>, a_b<t'>)		[(a<t'> forward, a<t'> backward)]
+
+Temos uma outra rede unidirecional que dará as saídas das palavras em inglês:
+	- Cada unidade S<t> depende de S<t-1>, y<t-1> e uma entrada c<t>, e tem como saída yhat<t>
+	- A entrada c<t> é uma soma das features de 3 palavras, dadas pela outra rede
+		-> alpha<1,1>, alpha<1,2>, alpha<1,3>:		[attention weights: alpha<t,t'> é "a quantidade de atenção que y<t> deveria prestar em a<t'>"]
+			- Restrição: sum(alpha<1, t'> para todo t') = 1
+			- c<1> = sum(alpha<1,t'> * a<t'> para todo t')
+	- Computando alpha<t,t'>:
+		-> alpha<t,t'> = exp(e<t,t'>) / sum(exp(e<t,t'>) para t' de 1 até Tx)
+		-> Uma rede neural pequena é treinada para calcular os vetores e<t,t'> tendo como entrada s<t-1> e a<t'>
+
+
+-> Speech Recognition - Audio Data
+
+[Speech Recognition]
+Dado um áudio (x) queremos gerar uma transcrição (y)
+Para resolver esse problema, temos duas opções:
+	- Attention Model
+	- Custo CTC (Connectionist Temporal Classification) para reconhecimento de fala 	[Graves et. al., 2006. CTC: Labeling unsegmented sequence data with RNN]
+		-> Ideia básica: saída com o mesmo tamanho da entrada
+		-> Gera uma saída no formato: ttttt_h_eeee___ ___qqqq...
+			- Regra: Colapsar caracteres repetidos não separados por "blank"
+
+[Trigger Word Detection]
+Exemplos: "Okay Google", "Hey Siri", "Alexa"
+A saída tem o mesmo tamanho da entrada, quando y<t> = 1 quer dizer que a palavra/frase gatilho foi falada
+OBS: O conjunto de treino pode ficar muito desbalanceado (mais 0 do que 1)
+	-> Um "hack" para facilitar o treinamento é setar diversos 1's após a palavra ter sido falada (no lugar de setar apenas um para um tempo t específico)
